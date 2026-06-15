@@ -1,0 +1,86 @@
+---
+description: Backend-only data access, auth, and RBAC conventions
+alwaysApply: true
+---
+
+# API Architecture — Backend Gateway Pattern
+
+## Data flow (mandatory)
+
+```
+BookMyBarber-App  ──HTTP──►  BookMyBarber-bk  ──secret key──►  Supabase (Postgres)
+BookMyBarber-admin ──HTTP──►  BookMyBarber-bk  ──secret key──►  Supabase (Postgres)
+```
+
+- **Clients never** import `@supabase/supabase-js`, call Supabase REST/RPC, or hold Supabase keys.
+- **Only** `BookMyBarber-bk` talks to Supabase via `getSupabaseSecret()` — **database and storage only** (no Supabase Auth).
+- Clients use the shared Axios instance (`src/lib/api.ts`) → `EXPO_PUBLIC_API_URL` / `VITE_API_URL`.
+
+## Authentication (local JWT)
+
+- Login/register/logout/refresh: `POST/GET /v1/auth/*` on the backend only.
+- Passwords: **bcrypt** in `public.profiles.password_hash`.
+- Sessions: short-lived **access JWT** (`JWT_ACCESS_SECRET`) + long-lived **refresh token** (opaque, bcrypt-hashed in `public.refresh_sessions`).
+- Clients store `bmb_access_token` and `bmb_refresh_token`; send `Authorization: Bearer <access>`.
+- Backend verifies access tokens with `jsonwebtoken` (not Supabase Auth).
+
+### OAuth sign-in (separate from calendar OAuth)
+
+| Provider | Route | Notes |
+|----------|-------|-------|
+| Google | `POST /v1/auth/google` `{ idToken }` | Verify with `google-auth-library` |
+| Microsoft | `GET /v1/auth/microsoft/connect`, `POST /v1/auth/microsoft/exchange` | Login scopes only; do not store tokens in `calendar_connections` |
+| Calendar Google/Microsoft | `/v1/calendar/*` | Existing barber calendar connect flows |
+
+## Authorization (RBAC)
+
+Roles live in **`public.profiles.role`**:
+
+| Role | Access |
+|------|--------|
+| `customer` | Mobile booking flows |
+| `barber` | Barber/staff operations |
+| `admin` | Admin dashboard routes |
+
+Every protected route **must** chain middleware:
+
+```typescript
+router.get("/resource", authenticate, authorize("admin"), handler);
+```
+
+- `authenticate` — requires valid Bearer access JWT; sets `req.user`
+- `authorize(...roles)` — requires `req.user.role` in allowed roles
+- Public routes: health, login, register, refresh, OAuth callbacks, SafePay webhook
+
+## Payments (SafePay only — no Stripe)
+
+```
+Clients → POST /v1/payments/checkout → BookMyBarber-bk → SafePay API
+SafePay → POST /v1/webhooks/safepay → update public.payments in Supabase
+```
+
+- **Never** use Stripe or `@supabase/supabase-js` for payments in clients.
+- **Never** add SafePay keys to `BookMyBarber-App` or `BookMyBarber-admin`.
+- Clients use `src/lib/payments.ts` → backend API only.
+- Backend SDK: `@sfpy/node-core` in `BookMyBarber-bk` only.
+- Currency: **PKR** (amount in rupees from client; backend converts to paisa for SafePay).
+- Checkout: Express Hosted (`source: hosted` | `mobile`).
+
+| Route | Access |
+|-------|--------|
+| `POST /v1/payments/checkout` | `customer` |
+| `GET /v1/payments/:tracker` | `customer`, `barber`, `admin` |
+| `POST /v1/webhooks/safepay` | Public (verify + re-fetch tracker) |
+
+## Adding a new backend route
+
+1. Implement handler under `BookMyBarber-bk/src/routes/v1/`
+2. Apply `authenticate` + `authorize(...)` unless explicitly public
+3. Use `getSupabaseSecret()` for all DB reads/writes
+4. Expose matching client method via `api.get/post/...` — no Supabase in clients
+
+## Forbidden in clients
+
+- `@supabase/supabase-js`, `stripe`, `@sfpy/node-core`
+- `EXPO_PUBLIC_SUPABASE_*` / `VITE_SUPABASE_*` / `SAFEPAY_*` env vars
+- Direct SQL, Storage, Realtime, or SafePay API usage

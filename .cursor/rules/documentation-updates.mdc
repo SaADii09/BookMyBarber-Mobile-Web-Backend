@@ -1,0 +1,43 @@
+---
+description: Mandatory documentation and code-quality report updates on every agent code change — no exceptions
+alwaysApply: true
+---
+
+# Documentation & code-quality updates (mandatory every change)
+
+## Applies to
+
+**Every** agent session that modifies project code or config in `BookMyBarber-bk/`, `BookMyBarber-admin/`, `BookMyBarber-App/`, or root tooling (`.fallowrc.json`, migrations, shared `docs/`).
+
+Finishing work without updating the files below is **not allowed**, including small fixes, refactors, and bug patches.
+
+## Canonical files (must stay current)
+
+| File | Update when |
+|------|-------------|
+| [`docs/code-quality.md`](../../docs/code-quality.md) | **Every** TS/JS (or Fallow-relevant) change — re-run Fallow, refresh metrics or note “verified unchanged” |
+| [`docs/PROJECT_PROGRESS.md`](../../docs/PROJECT_PROGRESS.md) | **Every** shipped change — changelog, Last updated, feature/bug/API rows as applicable |
+| [`docs/README.md`](../../docs/README.md) | New or renamed doc files linked from the index |
+
+Related rules: `code-quality.mdc` (Fallow workflow), `project-progress.mdc` (progress tracker).
+
+## End-of-session checklist (required)
+
+Before marking a task complete, agents **must**:
+
+1. **Run Fallow** for each touched workspace (`bookmybarber-bk`, `bookmybarber-admin`, `bookmybarber-app`) per `code-quality.mdc`, plus `tsc --noEmit` and Fallow `--unused-types` per `typescript-quality.mdc`.
+2. **Update `docs/code-quality.md`:**
+   - Bump **Last report** to today’s date.
+   - Refresh the monorepo summary table (Fallow **and TypeScript**) and the app section(s) you touched if counts changed.
+   - If metrics are unchanged, still bump the date and add a short **Session note** under that app (e.g. “2026-06-04 — verified; no metric delta after &lt;task&gt;”).
+3. **Update `docs/PROJECT_PROGRESS.md`:**
+   - Bump **Last updated** at the top.
+   - Append a **Changelog** row describing the change.
+   - Update feature matrix, API reference, known issues, or backlog when behavior or scope changed.
+4. **Improve code** where Fallow flagged safe wins in files you edited (see `code-quality.mdc`).
+
+## Do not
+
+- Skip doc updates because the change was “small” or “docs-only follow-up.”
+- Leave `docs/code-quality.md` with a stale **Last report** after editing application code.
+- Close a session with only code diffs and no documentation diff when TS/JS changed.

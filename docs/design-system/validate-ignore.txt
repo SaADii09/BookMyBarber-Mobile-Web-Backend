@@ -1,0 +1,3 @@
+# Paths excluded from validate-design-tokens.mjs until StyleSheet → NativeWind migration.
+# One glob per line (relative to repo root).
+# (empty — mobile app screens migrated to semantic tokens / NativeWind)

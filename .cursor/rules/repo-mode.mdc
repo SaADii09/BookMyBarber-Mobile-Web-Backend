@@ -1,0 +1,21 @@
+# Repo mode toggle (umbrella monorepo vs inner app repos)
+
+Read [`repos-mngmnt.txt`](../../repos-mngmnt.txt) for current mode and remotes.
+
+## When user wants to push to the **monorepo**
+
+1. `bash scripts/repo-mode.sh mono`
+2. From workspace root: `git status` → `git add -A` → `git commit -m "..."` → `git push origin main` (skip push if local-only)
+3. Update `CURRENT_MODE=mono` in `repos-mngmnt.txt` (script does this automatically)
+
+## When user wants to push to **inner repos**
+
+1. `bash scripts/repo-mode.sh inner`
+2. Per changed app (`BookMyBarber-bk`, `BookMyBarber-admin`, `BookMyBarber-App`): `git -C <app> add -A` → `commit` → `push origin main`
+3. Update `CURRENT_MODE=inner` in `repos-mngmnt.txt` (script does this automatically)
+
+## Rules
+
+- Only one git layer active at a time; use `bash scripts/repo-mode.sh status` to check.
+- Never delete `.git-inner` or `.git-umbrella` unless user explicitly asks to tear down a layer.
+- Do not edit the plan file at `~/.cursor/plans/`.

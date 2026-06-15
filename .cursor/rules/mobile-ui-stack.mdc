@@ -1,0 +1,57 @@
+---
+description: Mobile app UI stack — Expo Router, NativeWind, Moti, haptics, glass/blur
+globs: BookMyBarber-App/**/*
+alwaysApply: false
+---
+
+# Mobile UI Stack (BookMyBarber-App)
+
+Use this stack for **all new** mobile UI work. Legacy screens may still use `StyleSheet`; migrate incrementally.
+
+## Framework
+
+- **Expo** (managed workflow) + **Expo Router** — file-based routes under `src/app/`
+- Do not add React Navigation stacks outside expo-router unless required for a modal flow
+
+## Styling
+
+- **NativeWind v4** — use `className` on `View`, `Text`, `Pressable`, etc.
+- **Design system:** [`design-system.mdc`](./design-system.mdc) + [`docs/design-system/`](../../docs/design-system/) (Elegant Terracotta tokens)
+- **Do not** add new `StyleSheet.create` blocks for greenfield screens
+- Global CSS entry: `import '@/global.css'` in `src/app/_layout.tsx` only
+
+## Animations
+
+- **Moti** (`moti`) for declarative enter/exit and micro-interactions
+- **react-native-reanimated** under the hood — Reanimated Babel plugin must stay **last** in `babel.config.js`
+- Prefer `@/components/ui/moti-fade-in` or `MotiView` over React Native `Animated`
+
+## Gestures
+
+- **react-native-gesture-handler** — root is wrapped in `GestureHandlerRootView` in `_layout.tsx`
+- Use RNGH for swipes, pans, and future bottom sheets
+
+## Premium primitives (reuse)
+
+| Component | Import | Use for |
+|-----------|--------|---------|
+| `HapticPressable` | `@/components/ui` | Tappable CTAs (`haptic="medium"` on primary buttons) |
+| `GlassSurface` | `@/components/ui` | Frosted panels, modals, overlays (iOS glass + blur fallback) |
+| `MotiFadeIn` | `@/components/ui` | Screen/section fade-in |
+| `appAlert` | `@/lib/app-alert` | Errors, success, validation — **not** `Alert.alert` |
+| `AppDialog` / `AppDialogProvider` | `@/components/ui`, `@/contexts/app-dialog` | Modal feedback (wired in `_layout.tsx`) |
+
+## Forbidden in mobile client
+
+Same as `api-architecture.mdc`:
+
+- `@supabase/supabase-js`, Stripe, `@sfpy/node-core`
+- `EXPO_PUBLIC_SUPABASE_*`, `SAFEPAY_*`
+- Direct Supabase or SafePay API calls — use `src/lib/api.ts`, `auth.ts`, `payments.ts`
+- `Alert.alert` / `alert()` for user messages — use `appAlert` per design-system § Dialogs
+
+## After nativewind/babel/metro changes
+
+```bash
+cd BookMyBarber-App && npx expo start -c
+```

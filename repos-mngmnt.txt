@@ -1,0 +1,86 @@
+# BookMyBarber — repo mode management (AI + human reference)
+# Workspace root: c:\BOOKMYBARBER
+
+CURRENT_MODE=mono
+
+## Mode table
+
+| Mode   | Root git dir              | Inner app git dirs | Push target                          |
+|--------|---------------------------|--------------------|--------------------------------------|
+| mono   | .git (active)             | .git-inner (parked)| Umbrella remote (all apps + docs)    |
+| inner  | .git-umbrella (parked)    | .git (active)      | Each app's own GitHub remote         |
+
+Rule: only ONE layer is active at a time. Switching renames .git folders — nothing is deleted.
+
+## Remotes
+
+Umbrella (set after creating empty GitHub repo):
+  origin = https://github.com/Samad-Asif/BookMyBarber.git
+
+Inner repos (unchanged):
+  BookMyBarber-bk    -> https://github.com/Samad-Asif/BookMyBarber-bk.git
+  BookMyBarber-admin -> https://github.com/Samad-Asif/BookMyBarber-admin.git
+  BookMyBarber-App   -> https://github.com/Samad-Asif/BookMyBarber-App
+
+## Toggle (run from workspace root)
+
+  bash scripts/repo-mode.sh status   # show active layer
+  bash scripts/repo-mode.sh mono     # activate umbrella monorepo
+  bash scripts/repo-mode.sh inner    # activate inner app repos
+
+---
+
+## AI trigger: push to monorepo
+
+Phrases: "push to monorepo", "push code in the monorepo", "commit umbrella", "push umbrella"
+
+Steps:
+  1. bash scripts/repo-mode.sh mono
+  2. git status
+  3. git add -A
+  4. git commit -m "<message>"
+  5. git push origin main          # omit if local-only commit
+
+First-time umbrella remote (if not configured):
+  git remote add origin https://github.com/Samad-Asif/BookMyBarber.git
+  git push -u origin main
+
+---
+
+## AI trigger: push to inner repos
+
+Phrases: "push to inner repos", "push code in inner repos", "push backend/admin/app repo"
+
+Steps:
+  1. bash scripts/repo-mode.sh inner
+  2. For each changed app (BookMyBarber-bk, BookMyBarber-admin, BookMyBarber-App):
+       git -C <app> status
+       git -C <app> add -A
+       git -C <app> commit -m "<message>"
+       git -C <app> push origin main    # omit if local-only
+
+---
+
+## Reversibility / teardown
+
+Switch anytime:
+  bash scripts/repo-mode.sh mono  <->  bash scripts/repo-mode.sh inner
+
+Keep ONLY inner repos (drop umbrella):
+  bash scripts/repo-mode.sh inner
+  rm -rf .git-umbrella
+
+Keep ONLY monorepo (drop inner histories):
+  bash scripts/repo-mode.sh mono
+  rm -rf BookMyBarber-bk/.git-inner BookMyBarber-admin/.git-inner BookMyBarber-App/.git-inner
+
+Full undo of bootstrap:
+  bash scripts/repo-mode.sh inner
+  rm -rf .git-umbrella
+  rm -f .gitignore repos-mngmnt.txt scripts/repo-mode.sh
+
+## Notes
+
+- Inner and umbrella histories are independent; update both by switching mode and pushing again.
+- Close other Git UIs before switching to avoid half-renamed .git state.
+- In mono mode Cursor sees one repo at root; in inner mode each app folder is a normal repo.

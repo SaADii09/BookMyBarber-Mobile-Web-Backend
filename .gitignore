@@ -1,0 +1,13 @@
+# parked git layers (managed by scripts/repo-mode.sh)
+**/.git-inner/
+.git-umbrella/
+
+# deps / build / env (umbrella also honors each app's own .gitignore)
+**/node_modules/
+**/dist/
+**/build/
+**/.expo/
+**/coverage/
+**/.fallow/
+**/.env
+**/.env.*

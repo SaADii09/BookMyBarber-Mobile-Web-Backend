@@ -1,0 +1,88 @@
+---
+description: Mandatory Fallow + TypeScript code-quality workflow — analyze, improve, and update docs on every TS/JS change
+alwaysApply: true
+---
+
+# Code quality (Fallow + TypeScript) — mandatory for agents
+
+## Primary references
+
+- **[`docs/code-quality.md`](../../docs/code-quality.md)** — Fallow metrics **and TypeScript** baselines (tsc, DTO alignment, `any` hotspots) per app.
+- **[`.fallowrc.json`](../../.fallowrc.json)** — Workspace rules; duplication defaults to **semantic** mode; `unused-types: warn`.
+- **[`.agents/skills/fallow/SKILL.md`](../../.agents/skills/fallow/SKILL.md)** — CLI/MCP usage, JSON flags, fix workflow, gotchas. **Load this skill** before running Fallow or editing analysis-related config.
+- **[`.agents/skills/typescript-quality/SKILL.md`](../../.agents/skills/typescript-quality/SKILL.md)** — API DTO alignment, `tsc` checks, Fallow type hygiene. Load with **`typescript-best-practices`** on every TS/JS task.
+- **[`.cursor/rules/typescript-quality.mdc`](./typescript-quality.mdc)** — Mandatory TypeScript rules (companion to this file).
+
+Set `FALLOW_AGENT_SOURCE=cursor` when running CLI (does not enable telemetry).
+
+## When this applies
+
+**Every** task that creates or modifies TypeScript/JavaScript (`.ts`, `.tsx`, `.js`, `.jsx`, configs analyzed by Fallow), in any of:
+
+- `BookMyBarber-bk/`
+- `BookMyBarber-admin/`
+- `BookMyBarber-App/`
+
+Pure docs-only or non-code tasks are exempt.
+
+## Before coding (read)
+
+1. Read **`docs/code-quality.md`** for the workspace you touch (Fallow **and TypeScript** sections: dead code, dupes, complexity, DTO alignment, `any` hotspots).
+2. Load **`typescript-best-practices`** + **typescript-quality** skills when editing TS/JS.
+3. Cross-check **`docs/PROJECT_PROGRESS.md`** and architecture rules — do not “fix” unused exports that are planned public API without product confirmation.
+
+## During implementation (analyze)
+
+Run Fallow from the **monorepo root** (`c:\BOOKMYBARBER` or workspace root), scoped to the package you changed:
+
+```bash
+FALLOW_AGENT_SOURCE=cursor npx fallow dead-code --format json --quiet --summary --workspace <bookmybarber-bk|bookmybarber-admin|bookmybarber-app> 2>/dev/null || true
+FALLOW_AGENT_SOURCE=cursor npx fallow dupes --format json --quiet --workspace <workspace> 2>/dev/null || true
+FALLOW_AGENT_SOURCE=cursor npx fallow health --format json --quiet --score --workspace <workspace> 2>/dev/null || true
+FALLOW_AGENT_SOURCE=cursor npx fallow dead-code --format json --quiet --unused-types --workspace <workspace> 2>/dev/null || true
+```
+
+Type-check the package you changed (`tsc --noEmit` from that app directory). Fallow does **not** replace the compiler.
+
+For PR-sized edits, also:
+
+```bash
+FALLOW_AGENT_SOURCE=cursor npx fallow audit --format json --quiet --base main --changed-workspaces origin/main 2>/dev/null || true
+```
+
+**CLI rules (required):** `--format json --quiet 2>/dev/null`, append `|| true` (exit 1 = findings, not failure). Never run `fallow watch`. Always `--dry-run` before `fallow fix --yes`.
+
+Before deleting a flagged export/file/dependency, use trace when unsure:
+
+```bash
+fallow dead-code --format json --quiet --trace path/to/file.ts:exportName 2>/dev/null || true
+fallow dead-code --format json --quiet --trace-file path/to/file.ts 2>/dev/null || true
+```
+
+## Improve code (mandatory intent)
+
+Agents must **actively try to improve** quality in the same session when safe:
+
+- Remove or unexport confirmed dead code; suppress only with `// fallow-ignore-*` when intentional.
+- Extract shared helpers to fix **semantic** duplication (especially cross-app clones — prefer backend DTOs + client API types per `api-architecture.mdc` and `typescript-quality` skill).
+- Remove unused types (`unused-types`); replace `any` in files you touch; align client `src/lib/*` mirrors when backend DTOs change.
+- Reduce complexity in hotspots listed in `docs/code-quality.md` (e.g. mobile `src/app/index.tsx`, backend `booking.service.ts`).
+- Do **not** run `fallow fix --yes` blindly on OAuth/calendar/auth exports without trace + behavior check.
+
+## After every change (update docs — mandatory)
+
+**Required on every session** that touches TS/JS (see `documentation-updates.mdc`). Do not defer to “large refactors only.”
+
+1. Re-run the three workspace commands above for **each affected package**.
+2. **Update `docs/code-quality.md`** in the same session:
+   - Bump **Last report** to today’s date.
+   - Refresh summary table and app section(s) if metrics changed.
+   - If metrics are unchanged, still bump the date and add a one-line **Session note** under the touched app (task + “verified unchanged” or brief delta).
+3. **Update `docs/PROJECT_PROGRESS.md`** per `project-progress.mdc` (Last updated, Changelog, feature/bug/API rows when applicable).
+
+## Do not
+
+- Skip Fallow on TS/JS changes “because the task was small.”
+- Treat exit code 1 as a tool failure.
+- Enable `fallow telemetry` for the user.
+- Add remote `extends` URLs to `.fallowrc.json` without explicit user approval.

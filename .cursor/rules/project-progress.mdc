@@ -1,0 +1,56 @@
+---
+description: Require agents to read and update docs/PROJECT_PROGRESS.md for project context, features, and bugs
+alwaysApply: true
+---
+
+# Project progress documentation (mandatory for agents)
+
+## Primary context file
+
+**[`docs/PROJECT_PROGRESS.md`](../../docs/PROJECT_PROGRESS.md)** is the canonical tracker for:
+
+- Feature completion (backend, mobile, admin)
+- API routes and database schema
+- Known bugs and workarounds
+- Backlog and priorities
+- Changelog (append after shipping work)
+- Environment and ops checklist
+
+## Before starting work
+
+1. **Read** `docs/PROJECT_PROGRESS.md` (at least Quick status, Feature matrix for your area, Known issues, API reference if touching routes).
+2. Cross-check **architecture** rules: `api-architecture.mdc`, `project-structure.mdc`, and **code quality**: `code-quality.mdc` + `docs/code-quality.md`.
+3. Do **not** assume task-list checkboxes in old plans are current — trust `PROJECT_PROGRESS.md` first.
+
+## After every change (mandatory)
+
+Update documentation in the **same PR/session** — **every** code change, not only features or large PRs (see `documentation-updates.mdc`).
+
+### `docs/PROJECT_PROGRESS.md` (always)
+
+1. Bump **Last updated** date at the top.
+2. Add a **Changelog** row with date, area, and one-line summary.
+3. Change feature row status (✅ / 🟡 / ❌) when behavior or scope changed.
+4. Add or resolve **Known issues & bugs** when applicable.
+5. Update API reference, backlog, or env checklist when routes, schema, or ops changed.
+
+### `docs/code-quality.md` (always for TS/JS)
+
+Per `code-quality.mdc`: re-run Fallow and refresh **Last report** + metrics or session note — **no exceptions** for small edits.
+
+## Do not
+
+- Create duplicate progress docs elsewhere without syncing this file.
+- Edit the plan file `remaining_bmb_features_*.plan.md` unless the user explicitly asks.
+- Mark features ✅ in `PROJECT_PROGRESS.md` without the code existing in the repo.
+
+## Quick pointers
+
+| Need | Location |
+|------|----------|
+| All v1 routes | `docs/PROJECT_PROGRESS.md` → API reference |
+| Mobile screens | `docs/PROJECT_PROGRESS.md` → Mobile app screens |
+| Migrations | `BookMyBarber-bk/supabase/migrations/` |
+| SafePay | `.cursor/skills/safepay/SKILL.md` |
+
+When unsure what is already built, **grep the codebase** and then align `PROJECT_PROGRESS.md` with reality.

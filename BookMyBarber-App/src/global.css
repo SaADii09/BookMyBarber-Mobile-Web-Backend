@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 30 17% 98%;
+    --foreground: 218 22% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 218 22% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 218 22% 10%;
+
+    --primary: 25 81% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 24 13% 93%;
+    --secondary-foreground: 221 19% 15%;
+
+    --muted: 40 7% 94%;
+    --muted-foreground: 218 10% 45%;
+
+    --accent: 220 11% 93%;
+    --accent-foreground: 221 19% 15%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 24 11% 88%;
+    --input: 24 11% 88%;
+    --ring: 25 81% 52%;
+
+    --sidebar-background: 216 20% 8%;
+    --sidebar-foreground: 33 11% 90%;
+    --sidebar-primary: 25 81% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 223 14% 15%;
+    --sidebar-accent-foreground: 33 11% 90%;
+    --sidebar-border: 217 15% 18%;
+    --sidebar-ring: 25 81% 52%;
+
+    --chart-1: 25 81% 52%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 219 20% 25%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 12 76% 61%;
+
+    /* Web fallbacks in admin CSS; mobile tailwind.config uses single names for RN. */
+    --font-heading: 'Playfair Display';
+    --font-body: 'Inter';
+    --font-mono: ui-monospace, monospace;
+    --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
+    --font-serif: Georgia, 'Times New Roman', serif;
+  }
+}

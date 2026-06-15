@@ -1,0 +1,60 @@
+---
+description: Mandatory TypeScript quality — strict types, API DTO alignment, Fallow unused-types, tsc checks on every TS/JS change
+alwaysApply: true
+---
+
+# TypeScript quality — mandatory for agents
+
+## Primary references
+
+- **[`docs/code-quality.md`](../../docs/code-quality.md)** — TypeScript summary, per-app baselines, DTO alignment table, `any` hotspots.
+- **[`.agents/skills/typescript-quality/SKILL.md`](../../.agents/skills/typescript-quality/SKILL.md)** — Monorepo workflow; load on every TS/JS task.
+- **`typescript-best-practices`** — `c:\Users\saada\.claude\skills\typescript-best-practices\SKILL.md` (discriminated unions, Zod, branded types).
+- **[`.agents/skills/fallow/SKILL.md`](../../.agents/skills/fallow/SKILL.md)** — `unused-types`, semantic dupes (type drift signal).
+
+Works together with [`.cursor/rules/code-quality.mdc`](./code-quality.mdc) and [`.cursor/rules/documentation-updates.mdc`](./documentation-updates.mdc).
+
+## When this applies
+
+Same scope as `code-quality.mdc`: any change to `.ts`, `.tsx`, `.js`, `.jsx`, or TS config in `BookMyBarber-bk/`, `BookMyBarber-admin/`, `BookMyBarber-App/`.
+
+## Before coding (read)
+
+1. **`docs/code-quality.md`** — TypeScript section for the workspace you touch.
+2. Load **`typescript-best-practices`** + **typescript-quality** skills.
+3. For API work: backend route/service type is canonical; client types in `src/lib/` must stay aligned.
+
+## During implementation
+
+- **No new `any`** in backend (currently clean). Avoid new `any` in clients; replace when editing a function.
+- **Backend POST/PATCH** — prefer Zod schema + `z.infer` for request bodies (trust boundaries).
+- **Clients** — typed `api.get/post<…>` or explicit response interfaces; no `@supabase/supabase-js` types.
+- **Roles / status** — `as const` arrays + union types; exhaustive `switch` with `never` default.
+- **Fallow dupes** on identical interfaces — sync client mirror to backend DTO or extract shared backend `types.ts` and document client subset.
+
+## Analyze (required with Fallow)
+
+From monorepo root, for **each affected package**:
+
+```bash
+cd BookMyBarber-bk && npx tsc --noEmit 2>/dev/null || true
+cd BookMyBarber-admin && npx tsc --noEmit 2>/dev/null || true
+cd BookMyBarber-App && npx tsc --noEmit 2>/dev/null || true
+
+FALLOW_AGENT_SOURCE=cursor npx fallow dead-code --format json --quiet --unused-types --workspace <workspace> 2>/dev/null || true
+```
+
+Plus the standard Fallow commands in `code-quality.mdc`.
+
+## After every change (update docs)
+
+1. Re-run `tsc --noEmit` + Fallow (including `--unused-types`) for touched workspaces.
+2. **Update `docs/code-quality.md`** — bump **Last report**; refresh TypeScript table (`tsc`, `any` count, unused types) or add session note.
+3. **Update `docs/PROJECT_PROGRESS.md`** when type/API contracts changed.
+
+## Do not
+
+- Use `@ts-ignore` / `@ts-expect-error` to merge.
+- Import backend source into clients.
+- Skip type checks on “small” edits.
+- Treat Fallow as a substitute for `tsc` (Fallow explicitly does not type-check).

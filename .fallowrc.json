@@ -1,0 +1,60 @@
+{
+    "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/main/schema.json",
+    "entry": [
+        "BookMyBarber-bk/src/index.ts",
+        "BookMyBarber-bk/scripts/**/*.{mjs,ts}",
+        "BookMyBarber-admin/src/main.tsx",
+        "BookMyBarber-App/src/app/**/*.{tsx,ts}"
+    ],
+    "ignorePatterns": [
+        "**/*.generated.ts",
+        "**/*.d.ts",
+        "**/dist/**",
+        "**/build/**",
+        "**/.expo/**",
+        "**/coverage/**",
+        "**/storybook-static/**"
+    ],
+    "ignoreDependencies": [
+        "autoprefixer",
+        "postcss"
+    ],
+    "ignoreExportsUsedInFile": true,
+    "dynamicallyLoaded": [
+        "BookMyBarber-App/plugins/**/*.{js,ts}",
+        "BookMyBarber-App/scripts/**/*.{js,mjs}"
+    ],
+    "duplicates": {
+        "mode": "semantic",
+        "minTokens": 50,
+        "minLines": 5,
+        "minOccurrences": 2,
+        "ignoreDefaults": true
+    },
+    "health": {
+        "maxCyclomatic": 20,
+        "maxCognitive": 15,
+        "maxCrap": 30
+    },
+    "rules": {
+        "unused-files": "error",
+        "unused-exports": "warn",
+        "unused-types": "warn",
+        "re-export-cycle": "warn",
+        "stale-suppressions": "warn"
+    },
+    "overrides": [
+        {
+            "files": [
+                "**/*.test.ts",
+                "**/*.test.tsx",
+                "**/*.spec.ts",
+                "**/*.spec.tsx"
+            ],
+            "rules": {
+                "unused-exports": "off",
+                "unused-files": "off"
+            }
+        }
+    ]
+}

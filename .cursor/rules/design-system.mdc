@@ -1,0 +1,63 @@
+---
+description: Elegant Terracotta design tokens — colors, typography, semantic Tailwind classes
+globs: BookMyBarber-App/**/*, BookMyBarber-admin/**/*
+alwaysApply: false
+---
+
+# Elegant Terracotta Design System
+
+**Canonical spec:** [`docs/design-system/elegant-terracotta.md`](../../docs/design-system/elegant-terracotta.md)  
+**Token allowlist:** [`docs/design-system/tokens.ts`](../../docs/design-system/tokens.ts)
+
+## Typography
+
+| Role | Class | Font |
+|------|-------|------|
+| Headings (22px+) | `font-heading` | Playfair Display |
+| Body / UI (10–14px) | `font-body` | Inter |
+
+**React Native:** `tailwind.config.js` must use a **single** font family per token (e.g. `Inter`, not `Inter, sans-serif`). CSS font stacks break `TextInput` on Android (`fontFamily` must be a string).
+
+Mobile: prefer `AppText` from `@/components/ui` with `variant="heading" | "body" | "caption" | "label"`.
+
+## Dialogs and alerts (mobile)
+
+- **Do not** use `Alert.alert` from `react-native` or browser `alert()` in `BookMyBarber-App`.
+- Use `appAlert()` from `@/lib/app-alert` (requires `AppDialogProvider` in `src/app/_layout.tsx`).
+- Soft, non-blocking state (e.g. location fallback) → inline banner with `text-muted-foreground`, not a modal.
+- Spec: [`docs/design-system/elegant-terracotta.md`](../../docs/design-system/elegant-terracotta.md) § Dialogs and feedback.
+
+## Colors (semantic only in `.tsx`)
+
+| Intent | Classes |
+|--------|---------|
+| Page canvas | `bg-background` |
+| Body text | `text-foreground` |
+| Secondary text | `text-muted-foreground` |
+| Card | `bg-card border border-border` |
+| Primary CTA | `bg-primary text-primary-foreground` |
+| Destructive | `bg-destructive text-destructive-foreground` |
+| Admin sidebar | `bg-sidebar text-sidebar-foreground` |
+| Active nav | `text-sidebar-primary border-sidebar-primary` |
+| Charts | `text-chart-1` … `text-chart-5` or `CHART` constants |
+
+**Do not** add raw hex in component files. Exception: token/CSS definition files only.
+
+## Deprecated (never use in new UI)
+
+`#3c87f7`, `#2563eb`, `#1d4ed8`, `#0d0e11`, `#161719`, `#212225`, `#2e3135`, legacy blue Tailwind (`bg-blue-600`, etc.)
+
+## After UI changes
+
+```bash
+node .cursor/skills/design-system/scripts/validate-design-tokens.mjs
+```
+
+Read [`.cursor/skills/design-system/SKILL.md`](../skills/design-system/SKILL.md) for the full validation checklist.
+
+## App token files
+
+| App | Definitions |
+|-----|-------------|
+| Mobile | `BookMyBarber-App/src/global.css`, `tailwind.config.js` |
+| Admin | `BookMyBarber-admin/src/index.css` (`@theme`) |

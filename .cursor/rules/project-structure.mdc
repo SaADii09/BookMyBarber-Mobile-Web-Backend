@@ -1,0 +1,51 @@
+---
+description: BookMyBarber monorepo layout — canonical folder names and git repos
+alwaysApply: true
+---
+
+# BookMyBarber Workspace Layout
+
+This workspace is a **multi-repo monorepo folder**. Each app has its own git remote; do not rename these directories.
+
+| Role | Directory | Stack | Git repo |
+|------|-----------|-------|----------|
+| **Backend API** | `BookMyBarber-bk/` | Node.js + Express + TypeScript | `BookMyBarber-bk` |
+| **Admin dashboard** | `BookMyBarber-admin/` | React + Vite + TypeScript | `BookMyBarber-admin` |
+| **Mobile app** | `BookMyBarber-App/` | React Native + Expo | `BookMyBarber-App` |
+
+## Do not use
+
+- `backend/` — deprecated; use `BookMyBarber-bk/`
+- `admin-dashboard/` — deprecated; use `BookMyBarber-admin/`
+
+## Architecture (see also `api-architecture.mdc`)
+
+- **Clients → Backend → Supabase** only. No direct database/Supabase calls from `BookMyBarber-App` or `BookMyBarber-admin`.
+- Clients use `src/lib/api.ts` + `src/lib/auth.ts` → `http://localhost:5000/v1`
+- Backend uses **Supabase secret key only** (backend `.env`):
+  - `SUPABASE_URL` + `SUPABASE_SECRET_KEY` → Postgres, storage
+  - **Local JWT auth:** `JWT_ACCESS_SECRET`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL_DAYS`
+  - **OAuth login:** `GOOGLE_CLIENT_ID`, `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_AUTH_REDIRECT_URI`
+  - Legacy fallbacks: `SUPABASE_SERVICE_ROLE_KEY` for secret
+
+## Environment variables
+
+| App | Prefix | Required |
+|-----|--------|----------|
+| Backend | `PORT`, `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `JWT_*`, `SAFEPAY_*` | Supabase DB + JWT + SafePay server-only |
+| Mobile | `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID` | no Supabase keys |
+| Admin | `VITE_API_URL` | no Supabase keys |
+
+## Agent progress tracker
+
+- **`docs/PROJECT_PROGRESS.md`** — features, bugs, API, changelog (read/update per `project-progress.mdc`)
+- **`docs/code-quality.md`** — Fallow reports (read/update per `code-quality.mdc` + `documentation-updates.mdc` on **every** change)
+- **`documentation-updates.mdc`** — mandatory doc refresh checklist (always apply)
+
+## Boot commands (from workspace root)
+
+```bash
+cd BookMyBarber-bk && npm run dev
+cd BookMyBarber-admin && npm run dev
+cd BookMyBarber-App && npm start
+```

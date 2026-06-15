@@ -1,0 +1,82 @@
+{
+  "expo": {
+    "name": "BookMyBarber",
+    "slug": "book-my-barber",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/brand/ios-1024-light.png",
+    "scheme": "bookmybarberapp",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": {
+        "light": "./assets/images/brand/ios-1024-light.png",
+        "dark": "./assets/images/brand/ios-1024-dark.png"
+      },
+      "infoPlist": {
+        "CFBundleDisplayName": "BookMyBarber"
+      }
+    },
+    "android": {
+      "label": "BookMyBarber",
+      "icon": "./assets/images/brand/android-512-light.png",
+      "adaptiveIcon": {
+        "backgroundColor": "#E77423",
+        "foregroundImage": "./assets/images/brand/android-adaptive-foreground-light.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.samadbinasif.bookmybarber"
+    },
+    "web": {
+      "output": "static",
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "./plugins/withNinjaLongPaths",
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#E77423",
+          "image": "./assets/images/brand/ios-1024-light.png",
+          "imageWidth": 220,
+          "dark": {
+            "backgroundColor": "#E77423",
+            "image": "./assets/images/brand/ios-1024-dark.png"
+          },
+          "ios": {
+            "backgroundColor": "#E77423",
+            "image": "./assets/images/brand/ios-1024-light.png",
+            "dark": {
+              "backgroundColor": "#E77423",
+              "image": "./assets/images/brand/ios-1024-dark.png"
+            }
+          },
+          "android": {
+            "backgroundColor": "#E77423",
+            "image": "./assets/images/brand/android-splash-light.png",
+            "imageWidth": 200,
+            "dark": {
+              "backgroundColor": "#E77423",
+              "image": "./assets/images/brand/android-splash-dark.png"
+            }
+          }
+        }
+      ],
+      "expo-font",
+      "expo-image",
+      "@maplibre/maplibre-react-native"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3ad05d6b-d58f-415e-bbcb-342e8a5442e8"
+      }
+    },
+    "owner": "samadbinasif"
+  }
+}
