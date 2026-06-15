@@ -4,7 +4,7 @@
 > **Read this first** before implementing features, fixing bugs, or refactoring.  
 > **Update this file on every agent code change** (features, fixes, refactors, APIs, bugs) — same session as code, per `documentation-updates.mdc`.
 
-**Last updated:** 2026-06-04 (mobile Studio navigation — root Stack + (tabs) group)  
+**Last updated:** 2026-06-15 (umbrella monorepo + reversible repo-mode toggle)  
 **Maintainer:** Development team / any agent that completes a task
 
 ---
@@ -493,6 +493,7 @@ Agents **must** append a row when merging meaningful work.
 
 | Date | Author | Area | Change |
 |------|--------|------|--------|
+| 2026-06-15 | Agent | Infra | Umbrella monorepo at workspace root; `scripts/repo-mode.sh` toggles mono (umbrella) vs inner (per-app repos); see `repos-mngmnt.txt` + `.cursor/rules/repo-mode.mdc` |
 | 2026-06-04 | Agent | Payments | SafePay checkout: metadata `order_id` only (fixes `unsupported meta key user_id`); Zod checkout body; `toSafepayApiError` |
 | 2026-06-04 | Agent | Mobile | Studio navigation: root `Stack` + `(tabs)/` NativeTabs; `barber`/`checkout`/`book` as stack pushes; B-020 resolved |
 | 2026-06-04 | Agent | Booking/maps | `assertSlotBookable` + shop timezone migration; Zod booking routes; mobile book/bookings UX (cancel, pay, track); admin `GET /admin/bookings` + Bookings tab |

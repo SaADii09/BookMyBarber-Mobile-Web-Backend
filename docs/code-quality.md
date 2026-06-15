@@ -3,11 +3,13 @@
 > **Fallow:** [Fallow](https://docs.fallow.tools/) v2.88.2 — dead code, duplication (semantic), complexity, unused types.  
 > **TypeScript:** `tsc --noEmit` per app + alignment rules in [typescript-quality skill](../.agents/skills/typescript-quality/SKILL.md).  
 > **Config:** [`.fallowrc.json`](../.fallowrc.json) at monorepo root (three workspaces).  
-> **Last report:** 2026-06-04
+> **Last report:** 2026-06-15
 
 Agents **must** follow [`.cursor/rules/code-quality.mdc`](../.cursor/rules/code-quality.mdc), [`.cursor/rules/typescript-quality.mdc`](../.cursor/rules/typescript-quality.mdc), [`.cursor/rules/documentation-updates.mdc`](../.cursor/rules/documentation-updates.mdc), the [Fallow skill](../.agents/skills/fallow/SKILL.md), and the [TypeScript quality skill](../.agents/skills/typescript-quality/SKILL.md) (with **`typescript-best-practices`**).
 
 **Mandatory on every code change:** Re-run Fallow + `tsc`, then update this file (**Last report** + metrics or session note) and [`PROJECT_PROGRESS.md`](PROJECT_PROGRESS.md) in the same session.
+
+**Session note (2026-06-15):** Infra only — umbrella monorepo bootstrap + `scripts/repo-mode.sh` (mono/inner toggle); `repos-mngmnt.txt` + `.cursor/rules/repo-mode.mdc`; no TS/JS app changes; Fallow/`tsc` not re-run.
 
 **Session note (2026-06-04):** SafePay checkout fix — `safepay.service.ts` metadata `order_id` only; `schemas/payment.ts` Zod checkout; `toSafepayApiError`; bk `tsc` ✅.
 
