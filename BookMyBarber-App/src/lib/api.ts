@@ -8,10 +8,17 @@ export const REFRESH_TOKEN_STORAGE_KEY = "bmb_refresh_token";
 
 let refreshInFlight: Promise<string | null> | null = null;
 
+type OnTokensCleared = () => void;
+let onTokensCleared: OnTokensCleared | null = null;
+
+export function setOnTokensCleared(cb: OnTokensCleared | null) {
+  onTokensCleared = cb;
+}
+
 /** True when a non-empty JWT is stored (call before protected routes). */
-export async function hasStoredAccessToken(): Promise<boolean> {
+export async function hasStoredAccessToken(): Promise<string | null> {
   const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
-  return Boolean(token?.trim());
+  return token?.trim() || null;
 }
 
 export async function hasStoredRefreshToken(): Promise<boolean> {
@@ -106,9 +113,11 @@ export async function tryRestoreSession(): Promise<boolean> {
       const token = await refreshAccessToken();
       if (token) return true;
       await setSessionTokens(null, null);
+      onTokensCleared?.();
       return false;
     }
     await setSessionTokens(null, null);
+    onTokensCleared?.();
     return false;
   }
 
@@ -117,6 +126,7 @@ export async function tryRestoreSession(): Promise<boolean> {
   const token = await refreshAccessToken();
   if (token) return true;
   await setSessionTokens(null, null);
+  onTokensCleared?.();
   return false;
 }
 
@@ -141,6 +151,12 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+async function forceGuest(error: AxiosError): Promise<never> {
+  await setSessionTokens(null, null);
+  onTokensCleared?.();
+  return Promise.reject(error);
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
@@ -150,12 +166,33 @@ api.interceptors.response.use(
     if (
       error.response?.status !== 401 ||
       !original ||
-      original._retry ||
-      original.url?.includes("/auth/refresh") ||
-      original.url?.includes("/auth/login") ||
-      original.url?.includes("/auth/register")
+      original._retry
     ) {
       return Promise.reject(error);
+    }
+
+    const hadBearer = Boolean(
+      original.headers?.Authorization?.toString().startsWith("Bearer ")
+    );
+
+    if (
+      original.url?.includes("/auth/refresh") ||
+      original.url?.includes("/auth/login") ||
+      original.url?.includes("/auth/register") ||
+      original.url?.includes("/auth/logout") ||
+      original.url?.includes("/auth/google") ||
+      original.url?.includes("/auth/verify-email") ||
+      original.url?.includes("/auth/resend-verification") ||
+      original.url?.includes("/auth/forgot-password") ||
+      original.url?.includes("/auth/verify-reset-code") ||
+      original.url?.includes("/auth/reset-password") ||
+      original.url?.includes("/auth/microsoft/")
+    ) {
+      return Promise.reject(error);
+    }
+
+    if (!hadBearer) {
+      return forceGuest(error);
     }
 
     original._retry = true;
@@ -168,8 +205,7 @@ api.interceptors.response.use(
 
     const newToken = await refreshInFlight;
     if (!newToken) {
-      await setSessionTokens(null, null);
-      return Promise.reject(error);
+      return forceGuest(error);
     }
 
     original.headers.Authorization = `Bearer ${newToken}`;

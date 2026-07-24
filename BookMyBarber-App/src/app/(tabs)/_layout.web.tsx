@@ -30,24 +30,23 @@ export default function TabsLayout() {
         <TabList asChild>
           <CustomTabList>
             <TabTrigger name="index" href={'/' as Href} asChild>
-              <TabButton icon="house.fill">Home</TabButton>
-            </TabTrigger>
-            <TabTrigger name="explore" href="/explore" asChild>
-              <TabButton icon="questionmark.circle.fill">Support</TabButton>
+              <TabButton icon={{ ios: 'house.fill', android: 'home', web: 'home' } as const}>Home</TabButton>
             </TabTrigger>
             {showBookingsTab ? (
               <TabTrigger name="bookings" href="/bookings" asChild>
-                <TabButton icon="calendar">Bookings</TabButton>
+                <TabButton icon={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' } as const}>Bookings</TabButton>
               </TabTrigger>
             ) : null}
-            <TabTrigger name="style-guide" href="/style-guide" asChild>
-              <TabButton icon="paintpalette.fill">Style</TabButton>
-            </TabTrigger>
+            {user?.role === 'barber' ? (
+              <TabTrigger name="studio" href={'/studio/services' as Href} asChild>
+                <TabButton icon={{ ios: 'scissors', android: 'content_cut', web: 'content_cut' } as const}>Studio</TabButton>
+              </TabTrigger>
+            ) : null}
             <TabTrigger name="chat" href="/chat" asChild>
-              <TabButton icon="bubble.left.and.bubble.right.fill">Chat</TabButton>
+              <TabButton icon={{ ios: 'bubble.left.and.bubble.right.fill', android: 'forum', web: 'forum' } as const}>Chat</TabButton>
             </TabTrigger>
             <TabTrigger name="profile" href="/profile" asChild>
-              <TabButton icon="person.circle.fill">Profile</TabButton>
+              <TabButton icon={{ ios: 'person.circle.fill', android: 'account_circle', web: 'account_circle' } as const}>Profile</TabButton>
             </TabTrigger>
           </CustomTabList>
         </TabList>
@@ -104,7 +103,7 @@ function CustomTabList(props: TabListProps) {
             <ThemedText type="link">Docs</ThemedText>
             <SymbolView
               tintColor={colors.text}
-              name={{ ios: 'arrow.up.right.square', web: 'link' }}
+              name={{ ios: 'arrow.up.right.square', android: 'open_in_new', web: 'link' } as const}
               size={12}
             />
           </Pressable>

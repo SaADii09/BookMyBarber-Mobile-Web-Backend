@@ -1,18 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, TextInput, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, Stack } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { HapticPressable } from '@/components/ui';
 import { btn, chip, input, screen } from '@/constants/ui-classes';
+import { PLACEHOLDER_COLOR, COLORS } from '@/constants/design-tokens';
 import { appAlert } from '@/lib/app-alert';
 import { api } from '@/lib/api';
+import { useAuthSession } from '@/contexts/auth-session';
 
 export default function SupportScreen() {
+  const { status } = useAuthSession();
+
   const [targetType, setTargetType] = useState<'shop' | 'app'>('app');
   const [targetId, setTargetId] = useState('');
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    console.log('[Support] Screen mounted, status:', status);
+    if (status === 'guest') {
+      router.replace('/(auth)/login' as any);
+    }
+  }, [status]);
+
+  if (status === 'loading' || status === 'guest') {
+    return (
+      <SafeAreaView className={screen.center}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </SafeAreaView>
+    );
+  }
 
   const submit = async () => {
     if (!subject.trim() || !description.trim()) {
@@ -44,7 +64,8 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView className={screen.root}>
-      <ScrollView contentContainerClassName="gap-4 p-5">
+      <Stack.Screen options={{ title: 'Feedback & Support', headerShown: true }} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerClassName={screen.scrollContent}>
         <ThemedText type="subtitle">Feedback & Support</ThemedText>
         <ThemedText themeColor="textSecondary">
           Report an issue with the app or a specific barber shop.
@@ -65,7 +86,7 @@ export default function SupportScreen() {
           <TextInput
             className={input.base}
             placeholder="Shop ID (from shop detail)"
-            placeholderTextColor="#676F7E"
+            placeholderTextColor={PLACEHOLDER_COLOR}
             value={targetId}
             onChangeText={setTargetId}
           />
@@ -74,14 +95,14 @@ export default function SupportScreen() {
         <TextInput
           className={input.base}
           placeholder="Subject"
-          placeholderTextColor="#676F7E"
+          placeholderTextColor={PLACEHOLDER_COLOR}
           value={subject}
           onChangeText={setSubject}
         />
         <TextInput
           className={input.multiline}
           placeholder="Describe your feedback or complaint"
-          placeholderTextColor="#676F7E"
+          placeholderTextColor={PLACEHOLDER_COLOR}
           multiline
           value={description}
           onChangeText={setDescription}
@@ -93,7 +114,7 @@ export default function SupportScreen() {
           onPress={submit}
           disabled={submitting}>
           {submitting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={COLORS.primaryForeground} />
           ) : (
             <ThemedText className={btn.primaryText}>Submit feedback</ThemedText>
           )}

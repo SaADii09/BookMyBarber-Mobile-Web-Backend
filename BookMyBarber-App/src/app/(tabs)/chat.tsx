@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { HapticPressable } from '@/components/ui';
 import { btn, card, input, screen } from '@/constants/ui-classes';
+import { COLORS } from '@/constants/design-tokens';
 import { api } from '@/lib/api';
 import { useAuthSession } from '@/contexts/auth-session';
 
@@ -68,7 +69,7 @@ export default function ChatScreen() {
           <TextInput
             className={input.base}
             placeholder="Barber user ID to start chat"
-            placeholderTextColor="#676F7E"
+            placeholderTextColor={COLORS.mutedForeground}
             value={barberId}
             onChangeText={setBarberId}
           />
@@ -85,13 +86,14 @@ export default function ChatScreen() {
         <KeyboardAvoidingView
           className="flex-1"
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <HapticPressable className="p-4" onPress={() => setRoomId(null)}>
+          <HapticPressable className="p-5" onPress={() => setRoomId(null)}>
             <ThemedText type="linkPrimary">← Back</ThemedText>
           </HapticPressable>
           <FlatList
             data={messages}
             keyExtractor={(item) => item.id}
-            contentContainerClassName="gap-2 p-4"
+            contentInsetAdjustmentBehavior="automatic"
+            contentContainerClassName="gap-2 p-5"
             renderItem={({ item }) => (
               <View
                 className={`max-w-[85%] rounded-xl p-2.5 ${
@@ -109,7 +111,7 @@ export default function ChatScreen() {
               value={text}
               onChangeText={setText}
               placeholder="Message…"
-              placeholderTextColor="#676F7E"
+              placeholderTextColor={COLORS.mutedForeground}
             />
             <HapticPressable className={btn.primary} onPress={send}>
               <ThemedText className={btn.primaryText}>Send</ThemedText>

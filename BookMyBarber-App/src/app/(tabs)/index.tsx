@@ -11,6 +11,7 @@ import {
   Platform,
   Linking,
   RefreshControl,
+  useColorScheme,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { MapPin, Search, Scissors, Star, X } from "lucide-react-native";
@@ -23,12 +24,16 @@ import { ShopPhoneInput } from "@/components/shop-phone-input";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { DashboardActionCards } from "@/components/barber/dashboard-action-cards";
+import { BarberShopCard } from "@/components/barber/barber-shop-card";
+import type { BarberShopSummary } from "@/lib/booking-types";
 import { HapticPressable } from "@/components/ui";
-import { COLORS, PLACEHOLDER_COLOR } from "@/constants/design-tokens";
+import { EmptyState } from "@/components/ui/empty-state";
+import { COLORS } from "@/constants/design-tokens";
 import { home } from "@/constants/home-ui";
 import axios from "axios";
-import { api } from "@/lib/api";
+import { api, hasStoredAccessToken } from "@/lib/api";
 import { useAuthSession } from "@/contexts/auth-session";
+import { useSystemBars } from "@/hooks/use-system-bars";
 import { autocompletePlaces, getPlaceDetails } from "@/lib/places";
 import {
   cameraFromCoords,
@@ -38,7 +43,7 @@ import {
 import { toPakistanE164 } from "@/lib/pakistan-phone";
 import { formatApiError } from "@/lib/network-error";
 import { appAlert } from "@/lib/app-alert";
-import { getNearbyShops, getRoutePath, reverseGeocode, updateShopLocation } from "@/lib/shops";
+import { getNearbyShops, getRoutePath, reverseGeocode, updateShopLocation, fetchMyShopSummary } from "@/lib/shops";
 
 export type MapLocationMode = "gps" | "city_fallback" | "permission_denied";
 
@@ -49,6 +54,7 @@ const CITY_COORDS: Record<"Gujranwala" | "Lahore" | "Vehari", { latitude: number
 };
 
 export default function HomeScreen() {
+  const scheme = useColorScheme();
   const { status, user, signOut } = useAuthSession();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -57,6 +63,7 @@ export default function HomeScreen() {
   // Customer state
   const [shops, setShops] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [mapExpanded, setMapExpanded] = useState(true);
   const [selectedShop, setSelectedShop] = useState<any>(null);
   const [shopDetail, setShopDetail] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
@@ -70,7 +77,7 @@ export default function HomeScreen() {
   const [routeMeta, setRouteMeta] = useState<{ distanceMeters: number; durationSeconds: number } | null>(null);
 
   // Barber state
-  const [myShops, setMyShops] = useState<any[]>([]);
+  const [myShops, setMyShops] = useState<BarberShopSummary[]>([]);
   const [addShopVisible, setAddShopVisible] = useState(false);
   const [newShopName, setNewShopName] = useState("");
   const [newShopDesc, setNewShopDesc] = useState("");
@@ -92,6 +99,12 @@ export default function HomeScreen() {
   const [newWorkerName, setNewWorkerName] = useState("");
   const [newWorkerSpecialties, setNewWorkerSpecialties] = useState("");
 
+  const anyModalOpen = !!(selectedShop || addShopVisible || manageWorkersShop);
+  useSystemBars({
+    statusBarStyle: anyModalOpen ? 'light' : scheme === 'dark' ? 'light' : 'dark',
+    navigationBarStyle: scheme === 'dark' ? 'light' : 'dark',
+  });
+
   useEffect(() => {
     if (status === "authenticated") {
       fetchProfileAndData();
@@ -106,6 +119,9 @@ export default function HomeScreen() {
       if (placesDebounceRef.current) {
         clearTimeout(placesDebounceRef.current);
       }
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
     };
   }, []);
 
@@ -117,12 +133,21 @@ export default function HomeScreen() {
 
   const fetchProfileAndData = async (opts?: { silent?: boolean }) => {
     if (!opts?.silent) setLoading(true);
+
+    // If no access token is stored, immediately transition to guest
+    // instead of hitting the backend with a missing Authorization header.
+    if (!(await hasStoredAccessToken())) {
+      if (!opts?.silent) setLoading(false);
+      signOut();
+      return;
+    }
+
     try {
       const { data } = await api.get("/app/profile");
       setProfile(data.profile);
 
       if (data.profile.role === "customer") {
-        fetchCustomerShops(data.profile.city);
+        await fetchCustomerShops(data.profile.city);
         fetchNearbyShops();
       } else if (data.profile.role === "barber") {
         fetchBarberShops();
@@ -130,7 +155,8 @@ export default function HomeScreen() {
     } catch (err) {
       if (axios.isAxiosError(err)) {
         if (err.response?.status === 401) {
-          await signOut();
+          if (!opts?.silent) setLoading(false);
+          signOut();
           return;
         }
         if (err.response?.status === 403) {
@@ -243,9 +269,6 @@ export default function HomeScreen() {
         limit: 50,
       });
       setMapShops(data.shops || []);
-      if (!query) {
-        setShops(data.shops || []);
-      }
     } catch (err) {
       console.error("Failed to load nearby shops", err);
       appAlert("Could not load nearby shops", formatApiError(err, "Try again in a moment."), undefined, {
@@ -256,21 +279,27 @@ export default function HomeScreen() {
 
   const fetchCustomerShops = async (city: string, query = "") => {
     try {
-      const { data } = await api.get("/app/shops/search", {
-        params: { city, query: query || undefined },
-      });
+      const params: Record<string, string> = {};
+      if (city) params.city = city;
+      if (query) params.query = query;
+      const { data } = await api.get("/app/shops/search", { params });
       setShops(data.shops || []);
     } catch (err) {
       console.error("Failed to search shops", err);
     }
   };
 
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleSearch = (text: string) => {
     setSearchQuery(text);
-    if (profile) {
-      fetchCustomerShops(profile.city, text);
-      fetchNearbyShops(text);
-    }
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      if (profile) {
+        fetchCustomerShops(profile.city, text);
+        fetchNearbyShops(text);
+      }
+    }, 300);
   };
 
   const handleViewShopDetails = async (shop: any) => {
@@ -432,8 +461,8 @@ export default function HomeScreen() {
   // Barber methods
   const fetchBarberShops = async () => {
     try {
-      const { data } = await api.get("/app/shops/my");
-      setMyShops(data.shops || []);
+      const shops = await fetchMyShopSummary();
+      setMyShops(shops);
     } catch (err) {
       console.error("Failed to load my shops", err);
     }
@@ -648,88 +677,126 @@ export default function HomeScreen() {
             </HapticPressable>
           </View>
 
-          {/* Search bar */}
+          {/* Search bar with clear button */}
           <View className={home.searchSection}>
-            <Search size={18} color="#676F7E" className={home.searchIcon} />
+            <Search size={18} color={COLORS.mutedForeground} className={home.searchIcon} />
             <TextInput
               className={home.searchInput}
               placeholder="Search barber shops..."
-              placeholderTextColor="#676F7E"
+              placeholderTextColor={COLORS.mutedForeground}
               value={searchQuery}
               onChangeText={handleSearch}
             />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                className={home.clearSearchBtn}
+                onPress={() => {
+                  setSearchQuery("");
+                  if (profile) fetchCustomerShops(profile.city, "");
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <X size={18} color={COLORS.mutedForeground} />
+              </TouchableOpacity>
+            )}
           </View>
 
+          {/* Results count badge */}
+          {searchQuery.trim().length > 0 && (
+            <View className={home.searchResultBadge}>
+              <ThemedText className={home.resultCount}>
+                {shops.length > 0
+                  ? `${shops.length} shop${shops.length !== 1 ? "s" : ""} found for "${searchQuery}"`
+                  : `No results for "${searchQuery}"`}
+              </ThemedText>
+            </View>
+          )}
+
+          {/* Collapsible Map Section */}
           <View className="mb-4">
-            <ThemedText type="smallBold" className="mb-2">
-              Nearby on map ({radiusKm} km)
-            </ThemedText>
-            {mapLocationMode && mapLocationMode !== "gps" ? (
-              <ThemedText themeColor="textSecondary" className="mb-2 font-body text-xs">
-                {mapLocationMode === "permission_denied"
-                  ? `Location permission denied. Showing shops near ${profile?.city ?? "your city"} center.`
-                  : `Using ${profile?.city ?? "your city"} center — enable location for results near you.`}
+            <TouchableOpacity
+              className={home.mapToggle}
+              onPress={() => setMapExpanded((prev) => !prev)}
+              activeOpacity={0.7}
+            >
+              <ThemedText className={home.mapToggleLabel}>
+                {mapExpanded ? "Collapse map" : `Map (${radiusKm} km)`}
               </ThemedText>
-            ) : null}
-            {mapCamera && Platform.OS !== "web" ? (
-              <NearbyShopsMap
-                camera={mapCamera}
-                shops={mapShops}
-                trackingCoords={trackingCoords}
-                selectedShop={selectedShop}
-                routePolyline={routePolyline}
-                onShopPress={handleViewShopDetails}
-                onCameraChange={setMapCamera}
-              />
-            ) : (
-              <View className={home.emptyState}>
-                <ThemedText themeColor="textSecondary">
-                  {mapLocationMode === "permission_denied" || mapLocationMode === "city_fallback"
-                    ? `Map preview needs location. Nearby list uses ${profile?.city ?? "your city"} center.`
-                    : "Map preview is unavailable on this platform."}
-                </ThemedText>
-              </View>
-            )}
-            <TouchableOpacity className={`${home.addBtnSecondary} mt-3`} onPress={() => fetchNearbyShops(searchQuery)}>
-              <MapPin size={16} color={COLORS.primary} />
-              <ThemedText className={home.addBtnTextSecondary}>Refresh nearby barbers</ThemedText>
+              <ThemedText className="font-body text-xs text-primary">
+                {mapExpanded ? "▲ Hide" : "▼ Show"}
+              </ThemedText>
             </TouchableOpacity>
-            {routeMeta && (
-              <ThemedText type="small" themeColor="textSecondary" className="mt-2">
-                Route: {(routeMeta.distanceMeters / 1000).toFixed(1)} km • {Math.ceil(routeMeta.durationSeconds / 60)} min
-              </ThemedText>
+
+            {mapExpanded && (
+              <>
+                {mapLocationMode && mapLocationMode !== "gps" ? (
+                  <ThemedText themeColor="textSecondary" className="mb-2 font-body text-xs">
+                    {mapLocationMode === "permission_denied"
+                      ? `Location permission denied. Showing shops near ${profile?.city ?? "your city"} center.`
+                      : `Using ${profile?.city ?? "your city"} center — enable location for results near you.`}
+                  </ThemedText>
+                ) : null}
+                {mapCamera && Platform.OS !== "web" ? (
+                  <NearbyShopsMap
+                    camera={mapCamera}
+                    shops={mapShops}
+                    trackingCoords={trackingCoords}
+                    selectedShop={selectedShop}
+                    routePolyline={routePolyline}
+                    onShopPress={handleViewShopDetails}
+                    onCameraChange={setMapCamera}
+                  />
+                ) : (
+                  <View className={home.emptyState}>
+                    <ThemedText themeColor="textSecondary">
+                      {mapLocationMode === "permission_denied" || mapLocationMode === "city_fallback"
+                        ? `Map preview needs location. Nearby list uses ${profile?.city ?? "your city"} center.`
+                        : "Map preview is unavailable on this platform."}
+                    </ThemedText>
+                  </View>
+                )}
+                <TouchableOpacity className={`${home.addBtnSecondary} mt-3`} onPress={() => fetchNearbyShops(searchQuery)}>
+                  <MapPin size={16} color={COLORS.primary} />
+                  <ThemedText className={home.addBtnTextSecondary}>Refresh nearby barbers</ThemedText>
+                </TouchableOpacity>
+                {routeMeta && (
+                  <ThemedText type="small" themeColor="textSecondary" className="mt-2">
+                    Route: {(routeMeta.distanceMeters / 1000).toFixed(1)} km • {Math.ceil(routeMeta.durationSeconds / 60)} min
+                  </ThemedText>
+                )}
+                {isTracking && selectedShop?.address ? (
+                  <ThemedText type="small" themeColor="textSecondary" className="mt-2">
+                    Navigating to: {selectedShop.address}, {selectedShop.city}
+                  </ThemedText>
+                ) : null}
+                {isTracking ? (
+                  <TouchableOpacity
+                    className={`${home.logoutBtn} mt-3`}
+                    onPress={stopTracking}
+                  >
+                    <ThemedText className="font-body text-sm text-destructive">Stop live tracking</ThemedText>
+                  </TouchableOpacity>
+                ) : null}
+              </>
             )}
-            {isTracking && selectedShop?.address ? (
-              <ThemedText type="small" themeColor="textSecondary" className="mt-2">
-                Navigating to: {selectedShop.address}, {selectedShop.city}
-              </ThemedText>
-            ) : null}
-            {isTracking ? (
-              <TouchableOpacity
-                className={`${home.logoutBtn} mt-3`}
-                onPress={stopTracking}
-              >
-                <ThemedText className="font-body text-sm text-destructive">Stop live tracking</ThemedText>
-              </TouchableOpacity>
-            ) : null}
           </View>
 
           {/* List Section */}
-          <ThemedText type="subtitle" className={home.sectionTitle}>
-            Available Barber Shops
-          </ThemedText>
-
-          {shops.length === 0 ? (
-            <View className={home.emptyState}>
-              <Scissors size={48} color="#676F7E" />
-              <ThemedText themeColor="textSecondary" className="mt-3">
-                No verified shops in {profile.city} matching queries.
-              </ThemedText>
-            </View>
+          {shops.length === 0 && searchQuery.trim().length === 0 ? (
+            <EmptyState
+              icon={<Scissors size={48} color={COLORS.mutedForeground} />}
+              title={`No verified shops in ${profile.city} yet.`}
+            />
+          ) : shops.length === 0 && searchQuery.trim().length > 0 ? (
+            <EmptyState
+              icon={<Search size={48} color={COLORS.mutedForeground} />}
+              title={`No shops match "${searchQuery}" in ${profile.city}.`}
+            />
           ) : (
             <FlatList
               data={shops}
               keyExtractor={(item) => item.id}
+              style={{ flex: 1 }}
               contentContainerStyle={{ gap: 16, paddingBottom: 100 }}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -743,16 +810,27 @@ export default function HomeScreen() {
                         {item.name}
                       </ThemedText>
                       <View className={home.ratingBadge}>
-                        <Star size={12} color="#E8C468" fill="#E8C468" />
+                        <Star size={12} color={COLORS.chart4} fill={COLORS.chart4} />
                         <ThemedText type="code" className="ml-1 text-[11px] text-foreground">4.8</ThemedText>
                       </View>
                     </View>
                     <ThemedText themeColor="textSecondary" className="mt-1" numberOfLines={1}>
                       {item.description}
                     </ThemedText>
-                    <ThemedText type="code" themeColor="textSecondary" className="mt-2 text-[11px]">
-                      📍 {item.address}
-                    </ThemedText>
+                    <View className="mt-2 flex-row items-center gap-2">
+                      <MapPin size={12} color={COLORS.primary} />
+                      <ThemedText type="code" themeColor="textSecondary" className="text-[11px] flex-1">
+                        {item.address}
+                      </ThemedText>
+                      {(() => {
+                        const ms = mapShops.find((m: any) => m.id === item.id);
+                        return ms?.distance_km != null ? (
+                          <ThemedText className={home.shopDistance}>
+                            {ms.distance_km.toFixed(1)} km
+                          </ThemedText>
+                        ) : null;
+                      })()}
+                    </View>
                   </View>
                 </TouchableOpacity>
               )}
@@ -762,98 +840,166 @@ export default function HomeScreen() {
 
         {/* Shop Detail Overlay Modal */}
         <Modal visible={!!selectedShop} transparent animationType="slide">
-          <View className={home.modalOverlay}>
-            <View className={home.modalContent}>
-              <TouchableOpacity className={home.closeModalBtn} onPress={() => { setSelectedShop(null); setShopDetail(null); }}>
-                <X size={20} color="#14181F" />
-              </TouchableOpacity>
+          <View className="flex-1 justify-end bg-black/60">
+            <View className="bg-background rounded-t-3xl h-[80vh]">
+              <SafeAreaView edges={['bottom']} className="flex-1">
+                {/* Header bar */}
+                <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+                  <ThemedText type="subtitle" className="flex-1" numberOfLines={1}>
+                    {shopDetail?.shop?.name || ''}
+                  </ThemedText>
+                  <HapticPressable
+                    haptic="light"
+                    onPress={() => { setSelectedShop(null); setShopDetail(null); }}
+                    className="w-8 h-8 rounded-full bg-secondary items-center justify-center"
+                  >
+                    <ThemedText className="text-foreground text-sm">✕</ThemedText>
+                  </HapticPressable>
+                </View>
 
-              {loadingDetails || !shopDetail ? (
-                <ActivityIndicator size="large" color={COLORS.primary} className="p-10" />
-              ) : (
-                <ScrollView>
-                  <Image source={{ uri: shopDetail.shop.banner_url || "https://picsum.photos/400/200" }} className={home.modalBanner} />
-                  <View className={home.modalBody}>
-                    <ThemedText type="subtitle">
-                      {shopDetail.shop.name}
-                    </ThemedText>
-                    <ThemedText themeColor="textSecondary" className="my-2">
-                      {shopDetail.shop.description}
-                    </ThemedText>
-                    <ThemedText className="my-1 font-body text-primary">
-                      📍 {shopDetail.shop.address}, {shopDetail.shop.city}
-                    </ThemedText>
-                    <View className="mt-2 flex-row gap-2">
+                {loadingDetails || !shopDetail ? (
+                  <ActivityIndicator size="large" color={COLORS.primary} className="flex-1" />
+                ) : (
+                  <ScrollView
+                    className="flex-1"
+                    contentContainerClassName="gap-5 px-5 pb-6"
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {/* Banner */}
+                    <Image
+                      source={{ uri: shopDetail.shop.banner_url || "https://picsum.photos/400/200" }}
+                      className="h-[160px] w-full rounded-xl bg-muted"
+                      resizeMode="cover"
+                    />
+
+                    {/* Shop info */}
+                    <View className="gap-2">
+                      <ThemedText type="subtitle">{shopDetail.shop.name}</ThemedText>
+                      {shopDetail.shop.description ? (
+                        <ThemedText themeColor="textSecondary" className="font-body">
+                          {shopDetail.shop.description}
+                        </ThemedText>
+                      ) : null}
+                      <View className="flex-row items-center gap-1.5">
+                        <MapPin size={14} color={COLORS.primary} />
+                        <ThemedText className="font-body text-sm text-primary">
+                          {shopDetail.shop.address}, {shopDetail.shop.city}
+                        </ThemedText>
+                      </View>
+                    </View>
+
+                    {/* Action buttons */}
+                    <View className="flex-row gap-3">
                       <TouchableOpacity
-                        className={home.addBtnSecondary}
+                        className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-secondary py-3"
                         onPress={() => startTrackingToShop(shopDetail.shop)}
                       >
-                        <ThemedText className={home.addBtnTextSecondary}>
-                          {isTracking ? "Tracking active" : "Start live tracking"}
+                        <ThemedText className="font-body font-bold text-primary">
+                          {isTracking ? "Tracking active" : "Live tracking"}
                         </ThemedText>
                       </TouchableOpacity>
                       <TouchableOpacity
-                        className={home.addBtnSecondary}
+                        className="flex-1 flex-row items-center justify-center gap-2 rounded-xl border border-border bg-secondary py-3"
                         onPress={() => openExternalNavigation(shopDetail.shop)}
                       >
-                        <ThemedText className={home.addBtnTextSecondary}>Navigate to shop</ThemedText>
+                        <ThemedText className="font-body font-bold text-primary">
+                          Navigate
+                        </ThemedText>
                       </TouchableOpacity>
                     </View>
 
-                    <View className={home.divider} />
+                    {shopDetail.services?.length > 0 && (
+                      <TouchableOpacity
+                        className="h-12 items-center justify-center rounded-xl bg-primary"
+                        onPress={() => {
+                          setSelectedShop(null);
+                          setShopDetail(null);
+                          router.push(`/book/${shopDetail.shop.id}`);
+                        }}
+                      >
+                        <ThemedText className="font-body font-bold text-primary-foreground">
+                          Book Appointment
+                        </ThemedText>
+                      </TouchableOpacity>
+                    )}
 
-                    <ThemedText type="smallBold" className="mb-3">
-                      Experts & Specialists
-                    </ThemedText>
+                    <View className="h-px bg-border" />
 
+                    {/* Services */}
                     {shopDetail.services?.length > 0 && (
                       <>
-                        <ThemedText type="smallBold" className="mb-2">
-                          Services
-                        </ThemedText>
-                        {shopDetail.services.map((s: any) => (
-                          <ThemedText key={s.id} type="small" themeColor="textSecondary" className="mb-1">
-                            {s.name} — Rs {s.price_pkr} ({s.duration_minutes} min)
-                          </ThemedText>
-                        ))}
-                        <TouchableOpacity
-                          className={`${home.submitBtn} mt-3`}
-                          onPress={() => {
-                            setSelectedShop(null);
-                            router.push(`/book/${shopDetail.shop.id}`);
-                          }}
-                        >
-                          <ThemedText className="font-body font-bold text-primary-foreground">Book Appointment</ThemedText>
-                        </TouchableOpacity>
-                        <View className={home.divider} />
+                        <ThemedText type="smallBold">Services</ThemedText>
+                        <View className="gap-2">
+                          {shopDetail.services.map((s: any) => (
+                            <View key={s.id} className="flex-row items-center justify-between rounded-xl border border-border/50 bg-secondary/40 p-3">
+                              <View className="flex-1">
+                                <ThemedText className="font-body font-medium">{s.name}</ThemedText>
+                                <ThemedText className="font-body text-sm text-muted-foreground">
+                                  {s.duration_minutes} min
+                                </ThemedText>
+                              </View>
+                              <ThemedText className="font-body font-bold text-primary">
+                                Rs {s.price_pkr}
+                              </ThemedText>
+                            </View>
+                          ))}
+                        </View>
                       </>
                     )}
 
+                    {/* Experts & Specialists */}
+                    <ThemedText type="smallBold">Experts & Specialists</ThemedText>
                     {shopDetail.workers.length === 0 ? (
-                      <ThemedText themeColor="textSecondary">No specialists registered.</ThemedText>
+                      <ThemedText themeColor="textSecondary" className="font-body text-center py-4">
+                        No specialists registered.
+                      </ThemedText>
                     ) : (
-                      shopDetail.workers.map((w: any) => (
-                        <View key={w.id} className={home.workerRow}>
-                          <Image source={{ uri: w.avatar_url || "https://i.pravatar.cc/100" }} className={home.workerAvatar} />
-                          <View className="flex-1">
-                            <ThemedText type="smallBold">{w.name}</ThemedText>
-                            <View className={home.tagContainer}>
-                              {w.specialties.map((s: string, idx: number) => (
-                                <View key={idx} className={home.specialtyTag}>
-                                  <ThemedText type="code" className="text-[10px] text-primary">{s}</ThemedText>
-                                </View>
-                              ))}
+                      <View className="gap-3">
+                        {shopDetail.workers.map((w: any) => (
+                          <View key={w.id} className="flex-row items-center gap-3 rounded-xl border border-border/50 bg-secondary/40 p-3">
+                            <Image
+                              source={{ uri: w.avatar_url || "https://i.pravatar.cc/100" }}
+                              className="h-12 w-12 rounded-full bg-muted"
+                            />
+                            <View className="flex-1">
+                              <ThemedText type="smallBold">{w.name}</ThemedText>
+                              <View className="mt-1 flex-row flex-wrap gap-1.5">
+                                {(w.specialties || []).map((s: string, idx: number) => (
+                                  <View key={idx} className="rounded border border-primary/20 bg-primary/10 px-2 py-0.5">
+                                    <ThemedText type="code" className="text-[10px] text-primary">{s}</ThemedText>
+                                  </View>
+                                ))}
+                              </View>
                             </View>
                           </View>
-                        </View>
-                      ))
+                        ))}
+                      </View>
                     )}
-                  </View>
-                </ScrollView>
-              )}
+                  </ScrollView>
+                )}
+              </SafeAreaView>
             </View>
           </View>
         </Modal>
+      </ThemedView>
+    );
+  }
+
+  // 3. RECOVERY UI — no profile loaded (401/network error cleared session)
+  if (!profile) {
+    return (
+      <ThemedView className={home.container}>
+        <SafeAreaView className={`${home.safeArea} ${home.emptyState}`}>
+          <ThemedText type="subtitle" className="text-center">
+            Session expired
+          </ThemedText>
+          <ThemedText themeColor="textSecondary" className="mt-3 text-center px-6">
+            Your session has expired. Please sign in again.
+          </ThemedText>
+          <TouchableOpacity className={`${home.logoutBtn} mt-6`} onPress={() => signOut()}>
+            <ThemedText className="font-body text-sm text-destructive">Sign out</ThemedText>
+          </TouchableOpacity>
+        </SafeAreaView>
       </ThemedView>
     );
   }
@@ -867,7 +1013,7 @@ export default function HomeScreen() {
             {profile?.name?.trim() ? `Hi, ${profile.name.trim()}` : "Barber Dashboard"}
           </ThemedText>
           <ThemedText themeColor="textSecondary" className="mt-1 font-body text-sm">
-            Manage shops & specialist portfolios
+            Manage your salons & portfolios
           </ThemedText>
         </View>
         <HapticPressable className={home.accountChip} onPress={() => router.push("/profile" as Href)}>
@@ -877,8 +1023,8 @@ export default function HomeScreen() {
 
       <DashboardActionCards onAddShop={() => void openAddShop()} />
 
-      <ThemedText type="smallBold" className="mb-3 font-heading text-lg text-foreground">
-        My Registered Shops
+      <ThemedText type="smallBold" className="mb-4 font-heading text-lg text-foreground">
+        My Salons
       </ThemedText>
     </View>
   );
@@ -890,91 +1036,50 @@ export default function HomeScreen() {
           data={myShops}
           keyExtractor={(item) => item.id}
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={{ gap: 16, paddingBottom: 100, flexGrow: 1 }}
+          contentContainerStyle={{ gap: 12, paddingBottom: 100, flexGrow: 1 }}
           ListHeaderComponent={barberListHeader}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onBarberRefresh} tintColor={COLORS.primary} />
           }
           ListEmptyComponent={
-            <View className={home.emptyState}>
-              <Scissors size={48} color={PLACEHOLDER_COLOR} />
-              <ThemedText themeColor="textSecondary" className="mt-3">
-                No registered shops. Add your shop above.
-              </ThemedText>
-            </View>
+            <EmptyState
+              icon={<Scissors size={48} color={COLORS.mutedForeground} />}
+              title="No shops registered yet."
+            />
           }
-          renderItem={({ item }) => (
-            <View className={home.barberShopCard}>
-              <View className="flex-1">
-                <View className="flex-row items-center gap-2">
-                  <ThemedText type="smallBold">{item.name}</ThemedText>
-                  <View
-                    className={`${home.statusBadge} ${item.status === "approved" ? home.bgApproved : home.bgPending}`}
-                  >
-                    <ThemedText type="code" className="text-[9px] text-primary-foreground">
-                      {item.status}
-                    </ThemedText>
-                  </View>
-                </View>
-                <ThemedText themeColor="textSecondary" className="mt-1">
-                  {item.address}, {item.city}
-                </ThemedText>
-              </View>
-              <TouchableOpacity className={home.manageBtn} onPress={() => handleManageWorkers(item)}>
-                <ThemedText type="code" className="text-[11px] text-primary">
-                  Workers
-                </ThemedText>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className={`${home.manageBtn} ml-2`}
-                onPress={async () => {
-                  setNewShopAddr(item.address);
-                  setNewShopCity(item.city);
-                  const itemLat = item.latitude ? Number(item.latitude) : null;
-                  const itemLng = item.longitude ? Number(item.longitude) : null;
-                  setNewShopLat(itemLat);
-                  setNewShopLng(itemLng);
-                  setLocationEditShop(item);
-                  placesConfigAlertShownRef.current = false;
-                  await initializeAddShopMap(item.city, itemLat, itemLng);
-                  setAddShopVisible(true);
-                }}
-              >
-                <ThemedText type="code" className="text-[11px] text-primary">
-                  Location
-                </ThemedText>
-              </TouchableOpacity>
-            </View>
-          )}
+          renderItem={({ item }) => <BarberShopCard shop={item} />}
         />
 
         {/* Add Shop Modal */}
         <Modal visible={addShopVisible} transparent animationType="slide">
           <View className={home.modalOverlay}>
             <View className={home.modalContent}>
-              <TouchableOpacity
-                className={home.closeModalBtn}
-                onPress={() => {
-                  if (placesDebounceRef.current) clearTimeout(placesDebounceRef.current);
-                  setPlacePredictions([]);
-                  setAddShopVisible(false);
-                }}
-              >
-                <X size={20} color="#14181F" />
-              </TouchableOpacity>
+              <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+                <ThemedText type="subtitle" className="flex-1">Add Salon Shop</ThemedText>
+                <HapticPressable
+                  haptic="light"
+                  onPress={() => {
+                    if (placesDebounceRef.current) clearTimeout(placesDebounceRef.current);
+                    setPlacePredictions([]);
+                    setAddShopVisible(false);
+                  }}
+                  className="w-8 h-8 rounded-full bg-secondary items-center justify-center"
+                >
+                  <ThemedText className="text-foreground text-sm">✕</ThemedText>
+                </HapticPressable>
+              </View>
               <ScrollView contentContainerStyle={{ padding: 24, gap: 16 }}>
-                <ThemedText type="subtitle">Add Salon Shop</ThemedText>
                 <TextInput
                   className={home.modalInput}
                   placeholder="Shop Name"
-                  placeholderTextColor="#676F7E"
+                  placeholderTextColor={COLORS.mutedForeground}
                   value={newShopName}
                   onChangeText={setNewShopName}
                 />
                 <TextInput
                   className={home.modalInput}
                   placeholder="Description"
-                  placeholderTextColor="#676F7E"
+                  placeholderTextColor={COLORS.mutedForeground}
                   value={newShopDesc}
                   onChangeText={setNewShopDesc}
                 />
@@ -982,7 +1087,7 @@ export default function HomeScreen() {
                 <TextInput
                   className={home.modalInput}
                   placeholder="Search address"
-                  placeholderTextColor="#676F7E"
+                  placeholderTextColor={COLORS.mutedForeground}
                   value={placeSearch}
                   onChangeText={handlePlacesAutocomplete}
                 />
@@ -1005,7 +1110,7 @@ export default function HomeScreen() {
                 <TextInput
                   className={home.modalInput}
                   placeholder="Address Location"
-                  placeholderTextColor="#676F7E"
+                  placeholderTextColor={COLORS.mutedForeground}
                   value={newShopAddr}
                   onChangeText={setNewShopAddr}
                 />
@@ -1082,9 +1187,16 @@ export default function HomeScreen() {
         <Modal visible={!!manageWorkersShop} transparent animationType="slide">
           <View className={home.modalOverlay}>
             <View className={home.modalContent}>
-              <TouchableOpacity className={home.closeModalBtn} onPress={() => { setManageWorkersShop(null); setShopDetail(null); }}>
-                <X size={20} color="#14181F" />
-              </TouchableOpacity>
+              <View className="flex-row items-center justify-between px-5 pt-4 pb-2">
+                <ThemedText type="subtitle" className="flex-1">Manage Specialists</ThemedText>
+                <HapticPressable
+                  haptic="light"
+                  onPress={() => { setManageWorkersShop(null); setShopDetail(null); }}
+                  className="w-8 h-8 rounded-full bg-secondary items-center justify-center"
+                >
+                  <ThemedText className="text-foreground text-sm">✕</ThemedText>
+                </HapticPressable>
+              </View>
 
               {loadingDetails || !shopDetail ? (
                 <ActivityIndicator size="large" color={COLORS.primary} className="p-10" />
@@ -1095,19 +1207,18 @@ export default function HomeScreen() {
                   contentContainerStyle={{ padding: 24, gap: 16 }}
                   ListHeaderComponent={() => (
                     <View className="mb-5 gap-4">
-                      <ThemedText type="subtitle">Manage Specialists</ThemedText>
                       <ThemedText themeColor="textSecondary">Add experts to showcase on your shop profile.</ThemedText>
                       <TextInput
                         className={home.modalInput}
                         placeholder="Expert Name (e.g. Ali)"
-                        placeholderTextColor="#676F7E"
+                        placeholderTextColor={COLORS.mutedForeground}
                         value={newWorkerName}
                         onChangeText={setNewWorkerName}
                       />
                       <TextInput
                         className={home.modalInput}
                         placeholder="Specialties (comma separated, e.g. Beard, Fade)"
-                        placeholderTextColor="#676F7E"
+                        placeholderTextColor={COLORS.mutedForeground}
                         value={newWorkerSpecialties}
                         onChangeText={setNewWorkerSpecialties}
                       />

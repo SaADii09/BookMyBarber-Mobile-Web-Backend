@@ -1,5 +1,7 @@
 import { Text, type TextProps } from 'react-native';
 
+// @deprecated — use ThemedText instead. Existing usage is fine; new code should use ThemedText.
+
 export type AppTextVariant = 'heading' | 'body' | 'caption' | 'label';
 
 export type AppTextProps = TextProps & {

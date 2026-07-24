@@ -7,6 +7,13 @@ export interface TimeSlot {
   durationMinutes: number;
 }
 
+export interface CustomerBookingsQuery {
+  status?: string;
+  paymentStatus?: string;
+  from?: string;
+  to?: string;
+}
+
 export async function fetchShopDetail(shopId: string): Promise<ShopDetailResponse> {
   const { data } = await api.get(`/app/shops/${shopId}`);
   return data as ShopDetailResponse;
@@ -39,8 +46,10 @@ export async function createBooking(body: {
   return data.booking as CustomerBookingRow & { id: string; price_pkr: number };
 }
 
-export async function fetchMyBookings(): Promise<CustomerBookingRow[]> {
-  const { data } = await api.get('/app/bookings/mine');
+export async function fetchMyBookings(
+  params?: CustomerBookingsQuery
+): Promise<CustomerBookingRow[]> {
+  const { data } = await api.get('/app/bookings/mine', { params });
   return data.bookings as CustomerBookingRow[];
 }
 

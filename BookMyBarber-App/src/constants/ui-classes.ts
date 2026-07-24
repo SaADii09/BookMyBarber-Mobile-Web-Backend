@@ -14,6 +14,7 @@ export const card = {
 
 export const input = {
   base: 'bg-card border border-input rounded-xl px-4 py-3 text-foreground font-body',
+  error: 'bg-card border border-destructive rounded-xl px-4 py-3 text-foreground font-body',
   multiline: 'bg-card border border-input rounded-xl px-4 py-3 text-foreground font-body min-h-[120px]',
 } as const;
 

@@ -1,4 +1,5 @@
 import { api } from "./api";
+import type { BarberShopRow, BarberShopSummary } from "./booking-types";
 
 export type NearbyShopParams = {
   lat: number;
@@ -7,6 +8,16 @@ export type NearbyShopParams = {
   query?: string;
   limit?: number;
 };
+
+export async function fetchMyShops(): Promise<BarberShopRow[]> {
+  const { data } = await api.get('/app/shops/my');
+  return data.shops as BarberShopRow[];
+}
+
+export async function fetchMyShopSummary(): Promise<BarberShopSummary[]> {
+  const { data } = await api.get('/app/shops/my');
+  return data.shops as BarberShopSummary[];
+}
 
 export async function getNearbyShops(params: NearbyShopParams) {
   const { data } = await api.get("/app/shops/nearby", { params });
@@ -56,4 +67,21 @@ export async function getRoutePath(params: {
       points: { latitude: number; longitude: number }[];
     };
   };
+}
+
+export interface UpdateShopPayload {
+  name?: string;
+  description?: string | null;
+  businessPhone?: string | null;
+  websiteUrl?: string | null;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+}
+
+export async function updateShopDetails(
+  shopId: string,
+  payload: UpdateShopPayload,
+) {
+  const { data } = await api.patch(`/app/shops/${shopId}`, payload);
+  return data as { message: string; shop: BarberShopRow };
 }

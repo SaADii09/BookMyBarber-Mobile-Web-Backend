@@ -19,8 +19,12 @@ import workingHoursRouter from "./working-hours";
 import slotsRouter from "./slots";
 import bookingsRouter from "./bookings";
 import aiRouter from "./ai";
+import avatarRouter from "./avatar";
 import chatRouter from "./chat";
 import feedbacksRouter from "./feedbacks";
+import workersRouter from "./workers";
+import workerServicesRouter from "./worker-services";
+import workerAvailabilityRouter from "./worker-availability";
 
 const router = Router();
 const EARTH_RADIUS_KM = 6371;
@@ -52,8 +56,12 @@ router.use("/shops/:shopId/working-hours", workingHoursRouter);
 router.use("/shops/:shopId/slots", slotsRouter);
 router.use("/bookings", bookingsRouter);
 router.use("/ai", aiRouter);
+router.use("/profile/avatar", avatarRouter);
 router.use("/chat", chatRouter);
 router.use("/feedbacks", feedbacksRouter);
+router.use("/shops/:shopId/workers", workersRouter);
+router.use("/shops/:shopId/workers/:workerId/services", workerServicesRouter);
+router.use("/shops/:shopId/workers/:workerId/availability", workerAvailabilityRouter);
 
 /**
  * ----------------------------------------------------
@@ -192,6 +200,70 @@ router.post(
   })
 );
 
+/** PATCH /v1/app/shops/:id — update general shop details by owner */
+router.patch(
+  "/shops/:id",
+  authenticate,
+  authorize("barber"),
+  asyncHandler(async (req: Request, res: Response) => {
+    if (!req.user) throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
+
+    const { id: shopId } = req.params;
+    const { name, description, businessPhone, websiteUrl, logoUrl, bannerUrl } = req.body ?? {};
+
+    const supabase = getSupabaseSecret();
+
+    const { data: ownedShop } = await supabase
+      .from("barber_shops")
+      .select("id")
+      .eq("id", shopId)
+      .eq("owner_id", req.user.id)
+      .maybeSingle();
+    if (!ownedShop) {
+      throw new ApiError(403, "You do not own this shop", "FORBIDDEN");
+    }
+
+    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+    if (name !== undefined) {
+      if (typeof name !== "string" || !name.trim()) {
+        throw new ApiError(400, "name must be a non-empty string", "VALIDATION_ERROR");
+      }
+      updates.name = name.trim();
+    }
+    if (description !== undefined) {
+      updates.description = typeof description === "string" ? description : null;
+    }
+    if (businessPhone !== undefined) {
+      updates.business_phone = businessPhone !== null && String(businessPhone).trim() !== ""
+        ? validateBusinessPhone(businessPhone)
+        : null;
+    }
+    if (websiteUrl !== undefined) {
+      updates.website_url = typeof websiteUrl === "string" && websiteUrl.trim() ? websiteUrl.trim() : null;
+    }
+    if (logoUrl !== undefined) {
+      updates.logo_url = typeof logoUrl === "string" && logoUrl.trim() ? logoUrl.trim() : null;
+    }
+    if (bannerUrl !== undefined) {
+      updates.banner_url = typeof bannerUrl === "string" && bannerUrl.trim() ? bannerUrl.trim() : null;
+    }
+
+    const { data, error } = await supabase
+      .from("barber_shops")
+      .update(updates)
+      .eq("id", shopId)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw new ApiError(400, error.message, "UPDATE_FAILED");
+    }
+
+    res.json({ message: "Shop updated", shop: data });
+  })
+);
+
 /** PATCH /v1/app/shops/:id/location — update a shop location by owner */
 router.patch(
   "/shops/:id/location",
@@ -248,7 +320,7 @@ router.patch(
   })
 );
 
-/** GET /v1/app/shops/my — list logged in barber's shops */
+/** GET /v1/app/shops/my — list logged in barber's shops with aggregate counts */
 router.get(
   "/shops/my",
   authenticate,
@@ -257,7 +329,7 @@ router.get(
     if (!req.user) throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
 
     const supabase = getSupabaseSecret();
-    const { data, error } = await supabase
+    const { data: shops, error } = await supabase
       .from("barber_shops")
       .select("*")
       .eq("owner_id", req.user.id);
@@ -266,54 +338,40 @@ router.get(
       throw new ApiError(500, error.message, "DB_ERROR");
     }
 
-    res.json({ shops: data || [] });
-  })
-);
-
-/** POST /v1/app/shops/:id/workers — add a worker profile */
-router.post(
-  "/shops/:id/workers",
-  authenticate,
-  authorize("barber"),
-  asyncHandler(async (req: Request, res: Response) => {
-    if (!req.user) throw new ApiError(401, "Unauthorized", "UNAUTHORIZED");
-    const { id: shopId } = req.params;
-    const { name, specialties, avatarUrl, instagramHandle } = req.body ?? {};
-
-    if (!name) {
-      throw new ApiError(400, "worker name is required", "VALIDATION_ERROR");
+    const shopList = shops || [];
+    if (shopList.length === 0) {
+      res.json({ shops: [] });
+      return;
     }
 
-    const supabase = getSupabaseSecret();
+    const shopIds = shopList.map((s: Record<string, unknown>) => s.id as string);
 
-    // Verify ownership of the shop
-    const { data: shop } = await supabase
-      .from("barber_shops")
-      .select("owner_id")
-      .eq("id", shopId)
-      .single();
+    const [workerResult, serviceResult, hoursResult] = await Promise.all([
+      supabase.from("workers").select("shop_id").in("shop_id", shopIds),
+      supabase.from("shop_services").select("shop_id").in("shop_id", shopIds),
+      supabase.from("working_hours").select("shop_id").in("shop_id", shopIds).eq("is_active", true),
+    ]);
 
-    if (!shop || shop.owner_id !== req.user.id) {
-      throw new ApiError(403, "You do not own this shop", "FORBIDDEN");
-    }
+    const countByShop = (rows: { shop_id: string }[] | null) => {
+      const counts: Record<string, number> = {};
+      for (const row of rows || []) {
+        counts[row.shop_id] = (counts[row.shop_id] || 0) + 1;
+      }
+      return counts;
+    };
 
-    const { data: worker, error } = await supabase
-      .from("workers")
-      .insert({
-        shop_id: shopId,
-        name,
-        specialties: specialties || [],
-        avatar_url: avatarUrl,
-        instagram_handle: instagramHandle
-      })
-      .select()
-      .single();
+    const workerCounts = countByShop(workerResult.data);
+    const serviceCounts = countByShop(serviceResult.data);
+    const hoursShops = new Set((hoursResult.data || []).map((r: { shop_id: string }) => r.shop_id));
 
-    if (error) {
-      throw new ApiError(400, error.message, "DB_INSERT_FAILED");
-    }
+    const enriched = shopList.map((shop: Record<string, unknown>) => ({
+      ...shop,
+      worker_count: workerCounts[shop.id as string] || 0,
+      service_count: serviceCounts[shop.id as string] || 0,
+      has_active_hours: hoursShops.has(shop.id as string),
+    }));
 
-    res.status(201).json({ worker });
+    res.json({ shops: enriched });
   })
 );
 
@@ -323,7 +381,7 @@ router.post(
  * ----------------------------------------------------
  */
 
-/** GET /v1/app/shops/search — query approved shops by city */
+/** GET /v1/app/shops/search — query approved shops by city or globally */
 router.get(
   "/shops/search",
   authenticate,
@@ -331,20 +389,22 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const { city, query } = req.query;
 
-    if (!city) {
-      throw new ApiError(400, "city parameter is required (Gujranwala, Lahore, Vehari)", "VALIDATION_ERROR");
-    }
-
     const supabase = getSupabaseSecret();
     let dbQuery = supabase
       .from("barber_shops")
       .select("*")
-      .eq("city", city)
       .eq("status", "approved");
 
-    if (query) {
-      dbQuery = dbQuery.ilike("name", `%${query}%`);
+    if (city && typeof city === "string" && city.trim()) {
+      dbQuery = dbQuery.eq("city", city.trim());
     }
+
+    if (query && typeof query === "string" && query.trim().length >= 2) {
+      const q = `%${query.trim()}%`;
+      dbQuery = dbQuery.or(`name.ilike.${q},description.ilike.${q}`);
+    }
+
+    dbQuery = dbQuery.order("name").limit(20);
 
     const { data, error } = await dbQuery;
 

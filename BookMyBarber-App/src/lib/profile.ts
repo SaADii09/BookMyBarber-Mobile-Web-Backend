@@ -33,3 +33,16 @@ export async function updateProfile(input: UpdateProfileInput): Promise<AppProfi
   const { data } = await api.put<{ profile: AppProfile }>('/app/profile', input);
   return data.profile;
 }
+
+export async function uploadAvatar(imageUri: string): Promise<string> {
+  const form = new FormData();
+  form.append('avatar', {
+    uri: imageUri,
+    name: 'avatar.jpg',
+    type: 'image/jpeg',
+  } as unknown as Blob);
+  const { data } = await api.post<{ avatar_url: string }>('/app/profile/avatar', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return data.avatar_url;
+}

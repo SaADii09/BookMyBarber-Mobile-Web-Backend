@@ -86,7 +86,7 @@ export function NearbyShopsMapImpl({
             <Layer
               id="route-line"
               type="line"
-              paint={{ "line-color": "#E77423", "line-width": 5 }}
+              paint={{ "line-color": COLORS.primary, "line-width": 5 }}
             />
           </GeoJSONSource>
         ) : null}
@@ -104,7 +104,7 @@ export function NearbyShopsMapImpl({
             onPress={() => onShopPress(shop)}
           >
             <TouchableOpacity onPress={() => onShopPress(shop)} activeOpacity={0.8}>
-              <MapPin size={26} color="#676F7E" />
+              <MapPin size={26} color={COLORS.mutedForeground} />
             </TouchableOpacity>
           </Marker>
         ))}
@@ -127,7 +127,7 @@ export function NearbyShopsMapImpl({
             )}
             anchor="bottom"
           >
-            <MapPin size={30} color="#E77423" />
+            <MapPin size={30} color={COLORS.primary} />
           </Marker>
         ) : null}
       </Map>

@@ -2,6 +2,7 @@ import { View, TextInput } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { home } from "@/constants/home-ui";
+import { COLORS } from "@/constants/design-tokens";
 import {
   formatPakistanPhoneDisplay,
   sanitizePakistanPhoneInput,
@@ -27,7 +28,7 @@ export function ShopPhoneInput({ value, onChangeValue }: ShopPhoneInputProps) {
         <TextInput
           className={`${home.modalInput} flex-1`}
           placeholder="300 1234567"
-          placeholderTextColor="#676F7E"
+          placeholderTextColor={COLORS.mutedForeground}
           value={formatPakistanPhoneDisplay(value)}
           onChangeText={(text) => onChangeValue(sanitizePakistanPhoneInput(text))}
           keyboardType="phone-pad"

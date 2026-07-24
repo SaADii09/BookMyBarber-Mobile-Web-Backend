@@ -82,5 +82,6 @@ Full undo of bootstrap:
 ## Notes
 
 - Inner and umbrella histories are independent; update both by switching mode and pushing again.
-- Close other Git UIs before switching to avoid half-renamed .git state.
+- On Windows, `repo-mode.sh` uses PowerShell to rename `.git` dirs (Git Bash `mv` often fails with Permission denied).
+- If switch still fails, close Cursor/IDE Git panels and retry.
 - In mono mode Cursor sees one repo at root; in inner mode each app folder is a normal repo.

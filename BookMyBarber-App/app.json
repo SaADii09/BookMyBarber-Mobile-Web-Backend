@@ -7,6 +7,12 @@
     "icon": "./assets/images/brand/ios-1024-light.png",
     "scheme": "bookmybarberapp",
     "userInterfaceStyle": "automatic",
+    "backgroundColor": "#FFFFFF",
+    "splash": {
+      "image": "./assets/images/brand/ios-1024-light.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
     "ios": {
       "icon": {
         "light": "./assets/images/brand/ios-1024-light.png",
@@ -26,6 +32,10 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.samadbinasif.bookmybarber"
     },
+    "androidNavigationBar": {
+      "barStyle": "dark-content",
+      "backgroundColor": "#FBFAF9"
+    },
     "web": {
       "output": "static",
       "bundler": "metro",
@@ -37,29 +47,17 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#E77423",
+          "backgroundColor": "#FFFFFF",
           "image": "./assets/images/brand/ios-1024-light.png",
           "imageWidth": 220,
-          "dark": {
-            "backgroundColor": "#E77423",
-            "image": "./assets/images/brand/ios-1024-dark.png"
-          },
           "ios": {
-            "backgroundColor": "#E77423",
-            "image": "./assets/images/brand/ios-1024-light.png",
-            "dark": {
-              "backgroundColor": "#E77423",
-              "image": "./assets/images/brand/ios-1024-dark.png"
-            }
+            "backgroundColor": "#FFFFFF",
+            "image": "./assets/images/brand/ios-1024-light.png"
           },
           "android": {
-            "backgroundColor": "#E77423",
+            "backgroundColor": "#FFFFFF",
             "image": "./assets/images/brand/android-splash-light.png",
-            "imageWidth": 200,
-            "dark": {
-              "backgroundColor": "#E77423",
-              "image": "./assets/images/brand/android-splash-dark.png"
-            }
+            "imageWidth": 200
           }
         }
       ],

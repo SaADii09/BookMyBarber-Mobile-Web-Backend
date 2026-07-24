@@ -46,9 +46,9 @@ type ApiConnectivityBannerProps = {
 export function ApiConnectivityBanner({
   variant = "full",
 }: ApiConnectivityBannerProps) {
-  if (!__DEV__) return null;
-
   const { status, url, error, retry } = useApiConnectivity();
+
+  if (!__DEV__) return null;
 
   if (variant === "compact") {
     if (status !== "error") return null;

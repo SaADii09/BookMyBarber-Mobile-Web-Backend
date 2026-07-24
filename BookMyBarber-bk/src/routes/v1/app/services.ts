@@ -5,6 +5,10 @@ import { getSupabaseSecret } from "../../../config/supabase";
 import { ApiError } from "../../../lib/errors";
 import { assertShopOwner } from "../../../lib/shop";
 import { param } from "../../../lib/params";
+import {
+  createServiceBodySchema,
+  updateServiceBodySchema,
+} from "../../../schemas/services";
 
 const router = Router({ mergeParams: true });
 
@@ -33,15 +37,12 @@ router.post(
   authorize("barber"),
   asyncHandler(async (req: Request, res: Response) => {
     const shopId = param(req, "shopId");
-    const { name, description, durationMinutes, pricePkr } = req.body ?? {};
-
-    if (!name || !durationMinutes || !pricePkr) {
-      throw new ApiError(
-        400,
-        "name, durationMinutes, and pricePkr are required",
-        "VALIDATION_ERROR"
-      );
+    const parsed = createServiceBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const message = parsed.error.issues.map((i) => i.message).join("; ");
+      throw new ApiError(400, message, "VALIDATION_ERROR");
     }
+    const { name, description, durationMinutes, pricePkr } = parsed.data;
 
     await assertShopOwner(shopId, req.user!.id);
     const supabase = getSupabaseSecret();
@@ -69,19 +70,25 @@ router.patch(
   asyncHandler(async (req: Request, res: Response) => {
     const shopId = param(req, "shopId");
     const serviceId = param(req, "serviceId");
+    const parsed = updateServiceBodySchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const message = parsed.error.issues.map((i) => i.message).join("; ");
+      throw new ApiError(400, message, "VALIDATION_ERROR");
+    }
     await assertShopOwner(shopId, req.user!.id);
 
-    const { name, description, durationMinutes, pricePkr, isActive } =
-      req.body ?? {};
     const update: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
     };
-    if (name !== undefined) update.name = name;
-    if (description !== undefined) update.description = description;
-    if (durationMinutes !== undefined)
-      update.duration_minutes = durationMinutes;
-    if (pricePkr !== undefined) update.price_pkr = pricePkr;
-    if (isActive !== undefined) update.is_active = isActive;
+    if (parsed.data.name !== undefined) update.name = parsed.data.name;
+    if (parsed.data.description !== undefined)
+      update.description = parsed.data.description;
+    if (parsed.data.durationMinutes !== undefined)
+      update.duration_minutes = parsed.data.durationMinutes;
+    if (parsed.data.pricePkr !== undefined)
+      update.price_pkr = parsed.data.pricePkr;
+    if (parsed.data.isActive !== undefined)
+      update.is_active = parsed.data.isActive;
 
     const supabase = getSupabaseSecret();
     const { data, error } = await supabase

@@ -3,6 +3,7 @@ import { ActivityIndicator, View, StyleSheet } from "react-native";
 
 import { isMapNativeModuleExpected } from "@/lib/map-native";
 import { MapUnavailable } from "@/components/map-unavailable";
+import { COLORS } from "@/constants/design-tokens";
 import type { ShopLocationMapImplProps } from "@/components/shop-location-map-impl";
 
 export function ShopLocationMap(props: ShopLocationMapImplProps) {
@@ -33,7 +34,7 @@ export function ShopLocationMap(props: ShopLocationMapImplProps) {
   if (!Impl) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color="#E77423" />
+        <ActivityIndicator color={COLORS.primary} />
       </View>
     );
   }

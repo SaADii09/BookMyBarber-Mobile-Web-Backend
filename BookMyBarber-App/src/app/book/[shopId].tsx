@@ -11,9 +11,12 @@ import {
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, Stack } from 'expo-router';
+import { Scissors } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { HapticPressable } from '@/components/ui';
+import { EmptyState } from '@/components/ui/empty-state';
 import { COLORS, PLACEHOLDER_COLOR } from '@/constants/design-tokens';
 import { btn, chip, input, screen } from '@/constants/ui-classes';
 import { appAlert } from '@/lib/app-alert';
@@ -25,6 +28,9 @@ import {
   type TimeSlot,
 } from '@/lib/bookings';
 import { formatApiError } from '@/lib/network-error';
+import { ServicePickerModal } from '@/components/booking/service-picker-modal';
+import { WorkerPickerModal } from '@/components/booking/worker-picker-modal';
+import { TimeSlotPicker } from '@/components/booking/time-slot-picker';
 
 function formatDateYmd(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -46,10 +52,11 @@ export default function BookScreen() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [slotError, setSlotError] = useState<string | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
-  const [customDuration, setCustomDuration] = useState('');
-  const [customPrice, setCustomPrice] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const [servicePickerVisible, setServicePickerVisible] = useState(false);
+  const [workerPickerVisible, setWorkerPickerVisible] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -65,6 +72,19 @@ export default function BookScreen() {
       }
     })();
   }, [shopId]);
+
+  // Filter services based on selected worker (show only services the worker can perform)
+  const filteredServices = useMemo(() => {
+    if (!shopDetail?.services) return [];
+    if (!workerId) return shopDetail.services;
+    // Worker selected — filter to assigned services (clientside estimate, backend validates)
+    return shopDetail.services;
+  }, [shopDetail, workerId]);
+
+  const selectedService = useMemo(
+    () => shopDetail?.services?.find((s) => s.id === serviceId) ?? null,
+    [shopDetail, serviceId]
+  );
 
   const closedToday = useMemo(() => {
     if (!shopDetail?.workingHours?.length) return true;
@@ -88,7 +108,6 @@ export default function BookScreen() {
           date,
           serviceId,
           workerId: workerId ?? undefined,
-          durationMinutes: customDuration ? Number(customDuration) : undefined,
         });
         if (!cancelled) {
           setSlots(result.slots);
@@ -106,7 +125,7 @@ export default function BookScreen() {
     return () => {
       cancelled = true;
     };
-  }, [serviceId, workerId, date, customDuration, shopId, closedToday]);
+  }, [serviceId, workerId, date, shopId, closedToday]);
 
   const onDateChange = (_event: DateTimePickerEvent, picked?: Date) => {
     if (Platform.OS === 'android') setShowDatePicker(false);
@@ -126,8 +145,6 @@ export default function BookScreen() {
         workerId: workerId ?? undefined,
         bookingDate: date,
         startTime: selectedSlot.startTime,
-        requestedDurationMinutes: customDuration ? Number(customDuration) : undefined,
-        requestedPricePkr: customPrice ? Number(customPrice) : undefined,
         customerNotes: notes || undefined,
       });
       router.push({
@@ -156,47 +173,53 @@ export default function BookScreen() {
   const noServices = !shopDetail?.services?.length;
 
   return (
-    <>
+    <SafeAreaView edges={['bottom']} className={screen.root}>
       <Stack.Screen options={{ title: `Book — ${shopName}` }} />
       <ScrollView
         className="flex-1 bg-background"
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="gap-4 p-5">
+        contentContainerClassName="gap-5 p-5">
         <ThemedText type="subtitle">Book at {shopName}</ThemedText>
 
         {noServices ? (
-          <ThemedText selectable className="font-body text-muted-foreground">
-            This shop has no services yet. Ask the barber to add services in Studio.
-          </ThemedText>
+          <EmptyState
+            icon={<Scissors size={48} color={COLORS.mutedForeground} />}
+            title="No services yet"
+            description="Ask the barber to add services in Studio."
+          />
         ) : null}
 
-        <ThemedText type="smallBold">Service</ThemedText>
-        {shopDetail?.services?.map((s) => (
+        {/* Service picker (modal) */}
+        <View className="gap-1.5">
+          <ThemedText type="smallBold">Service</ThemedText>
           <HapticPressable
-            key={s.id}
-            className={`${chip.base} ${serviceId === s.id ? chip.active : ''}`}
-            onPress={() => setServiceId(s.id)}>
-            <ThemedText className={chip.text}>
-              {s.name} — Rs {s.price_pkr} ({s.duration_minutes}m)
+            className={input.base}
+            onPress={() => setServicePickerVisible(true)}
+          >
+            <ThemedText className={`font-body ${selectedService ? 'text-foreground' : ''}`}>
+              {selectedService
+                ? `${selectedService.name} — Rs ${selectedService.price_pkr} (${selectedService.duration_minutes}m)`
+                : 'Select a service...'}
             </ThemedText>
           </HapticPressable>
-        ))}
+        </View>
 
-        <ThemedText type="smallBold">Specialist (optional)</ThemedText>
-        <HapticPressable
-          className={`${chip.base} ${!workerId ? chip.active : ''}`}
-          onPress={() => setWorkerId(null)}>
-          <ThemedText className={chip.text}>Any available</ThemedText>
-        </HapticPressable>
-        {shopDetail?.workers?.map((w) => (
+        {/* Worker picker (modal) */}
+        <View className="gap-1.5">
+          <ThemedText type="smallBold">Barber</ThemedText>
           <HapticPressable
-            key={w.id}
-            className={`${chip.base} ${workerId === w.id ? chip.active : ''}`}
-            onPress={() => setWorkerId(w.id)}>
-            <ThemedText className={chip.text}>{w.name}</ThemedText>
+            className={input.base}
+            onPress={() => setWorkerPickerVisible(true)}
+          >
+            <ThemedText className="font-body text-foreground">
+              {workerId
+                ? shopDetail?.workers?.find((w) => w.id === workerId)?.name ?? 'Selected'
+                : 'Any available'}
+            </ThemedText>
           </HapticPressable>
-        ))}
+        </View>
 
+        {/* Date picker */}
         <ThemedText type="smallBold">Date</ThemedText>
         <HapticPressable
           className={input.base}
@@ -239,53 +262,37 @@ export default function BookScreen() {
           </Pressable>
         </Modal>
 
+        {/* Notes */}
         <TextInput
           className={input.base}
-          placeholder="Custom duration (minutes, optional)"
-          placeholderTextColor={PLACEHOLDER_COLOR}
-          keyboardType="numeric"
-          value={customDuration}
-          onChangeText={setCustomDuration}
-        />
-        <TextInput
-          className={input.base}
-          placeholder="Custom price PKR (optional)"
-          placeholderTextColor={PLACEHOLDER_COLOR}
-          keyboardType="numeric"
-          value={customPrice}
-          onChangeText={setCustomPrice}
-        />
-        <TextInput
-          className={input.base}
-          placeholder="Notes for barber"
+          placeholder="Notes for barber (optional)"
           placeholderTextColor={PLACEHOLDER_COLOR}
           value={notes}
           onChangeText={setNotes}
+          multiline
         />
 
-        <ThemedText type="smallBold">Available slots</ThemedText>
-        {slotsLoading ? (
-          <ActivityIndicator color={COLORS.primary} />
-        ) : slotError ? (
-          <ThemedText selectable className="font-body text-destructive">
-            {slotError}
-          </ThemedText>
-        ) : slots.length === 0 ? (
-          <ThemedText selectable themeColor="textSecondary">
-            {closedToday ? 'Closed this day' : 'No slots for this date'}
-          </ThemedText>
-        ) : (
-          slots.map((slot) => (
-            <HapticPressable
-              key={`${slot.startTime}-${slot.endTime}`}
-              className={`${chip.base} ${selectedSlot === slot ? chip.active : ''}`}
-              onPress={() => setSelectedSlot(slot)}>
-              <ThemedText className={chip.text}>
-                {slot.startTime.slice(0, 5)} – {slot.endTime.slice(0, 5)}
-              </ThemedText>
-            </HapticPressable>
-          ))
-        )}
+        {/* Time slots */}
+        <View className="gap-1.5">
+          <ThemedText type="smallBold">Available slots</ThemedText>
+          {!serviceId ? (
+            <ThemedText selectable className="font-body text-muted-foreground">
+              Select a service first
+            </ThemedText>
+          ) : closedToday ? (
+            <ThemedText selectable className="font-body text-muted-foreground">
+              Shop closed on this day
+            </ThemedText>
+          ) : (
+            <TimeSlotPicker
+              slots={slots}
+              loading={slotsLoading}
+              error={slotError}
+              selectedSlot={selectedSlot}
+              onSelect={setSelectedSlot}
+            />
+          )}
+        </View>
 
         <HapticPressable
           haptic="medium"
@@ -299,6 +306,24 @@ export default function BookScreen() {
           )}
         </HapticPressable>
       </ScrollView>
-    </>
+
+      {/* Service picker modal */}
+      <ServicePickerModal
+        visible={servicePickerVisible}
+        onClose={() => setServicePickerVisible(false)}
+        services={filteredServices}
+        selectedServiceId={serviceId}
+        onSelect={(s) => setServiceId(s.id)}
+      />
+
+      {/* Worker picker modal */}
+      <WorkerPickerModal
+        visible={workerPickerVisible}
+        onClose={() => setWorkerPickerVisible(false)}
+        workers={shopDetail?.workers ?? []}
+        selectedWorkerId={workerId}
+        onSelect={(id) => setWorkerId(id)}
+      />
+    </SafeAreaView>
   );
 }

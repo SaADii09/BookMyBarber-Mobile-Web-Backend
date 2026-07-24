@@ -36,11 +36,7 @@ export const home = {
   addBtnText: 'font-body font-bold text-primary-foreground',
   addBtnTextSecondary: 'font-body font-bold text-primary',
   barberShopCard:
-    'flex-row items-center rounded-2xl border border-border bg-card p-4',
-  statusBadge: 'rounded px-1.5 py-0.5',
-  bgApproved: 'bg-chart-2',
-  bgPending: 'bg-chart-4',
-  manageBtn: 'rounded-lg border border-primary/20 bg-primary/10 px-3 py-1.5',
+    'rounded-2xl border border-border bg-card p-4 mb-0',
   modalInput:
     'h-12 rounded-xl border border-input bg-card px-4 font-body text-sm text-foreground',
   citySelectBtn:
@@ -57,4 +53,12 @@ export const home = {
     'h-11 w-11 items-center justify-center rounded-xl bg-secondary',
   accountChip: 'rounded-lg border border-border bg-card px-3 py-1.5',
   listHeader: 'gap-0 pb-2',
+  searchResultBadge: 'mb-3 flex-row items-center justify-between',
+  resultCount: 'font-body text-sm text-muted-foreground',
+  mapToggle: 'flex-row items-center justify-between mb-2',
+  mapToggleLabel: 'font-body text-sm font-semibold text-foreground',
+  mapToggleChevron: 'p-1',
+  mapCollapsed: 'h-0 overflow-hidden',
+  clearSearchBtn: 'p-2 -mr-2',
+  shopDistance: 'font-body text-xs text-primary mt-1',
 } as const;

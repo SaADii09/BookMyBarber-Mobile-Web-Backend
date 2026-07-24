@@ -9,9 +9,14 @@ import { errorHandler } from "./middleware/errorHandler";
 import { logger } from "./config/logger";
 import { getSupabaseConfig, isSupabaseConfigured } from "./config/supabase";
 import { isSafepayConfigured } from "./config/safepay";
+import { startHaircutQueue } from "./services/haircut-queue.service";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 5000;
+
+// ngrok / reverse proxies set X-Forwarded-For. Required for express-rate-limit
+// (ERR_ERL_UNEXPECTED_X_FORWARDED_FOR when trust proxy is false).
+app.set("trust proxy", 1);
 
 const allowedOrigins = (
   process.env.CORS_ORIGINS ??
@@ -94,4 +99,7 @@ app.listen(PORT, "0.0.0.0", () => {
     secret: sb.secretKey ? sb.keySources.secret : "missing",
   });
   logger.info("SafePay", { configured: isSafepayConfigured() });
+
+  // Start haircut generation queue worker (polls for pending jobs)
+  startHaircutQueue();
 });
